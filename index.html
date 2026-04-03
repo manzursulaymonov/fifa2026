@@ -227,7 +227,7 @@ main { position: relative; z-index: 1; max-width: 1440px; margin: 0 auto; paddin
   <div id="page-scorers" class="page">
     <div class="sec">To'purarlar</div>
     <div style="background:rgba(240,192,64,.06);border:1px solid var(--border);border-radius:8px;padding:.75rem 1rem;margin-bottom:1.25rem;font-size:.8rem;color:var(--offwhite)">
-      ⚽ Gol ma'lumotlari <strong>TheSportsDB API</strong> dan avtomatik yuklanadi. O'yinlar boshlanishi bilan bu yerda ko'rinadi.
+      ⚽ Gol ma'lumotlari turnir boshlanishi bilan avtomatik yuklanadi (11-iyun 2026).
     </div>
     <div id="scorer-list" class="scorerlist">
       <div class="skel" style="height:60px"></div>
@@ -287,7 +287,6 @@ Object.keys(GROUPS).forEach(function(g) {
       homeScore: null,
       awayScore: null,
       status: 'NS',
-      apiId: null,
       homeScorers: [],
       awayScorers: [],
       stats: null
@@ -397,8 +396,7 @@ function fmtTime(timeStr) {
 // ═══════════════════════════════════════════════════
 // STATE
 // ═══════════════════════════════════════════════════
-var API_BASE = 'https://www.thesportsdb.com/api/v1/json/123';
-var LEAGUE_ID = '4429';
+var DATA_URL = 'https://raw.githubusercontent.com/openfootball/worldcup.json/master/2026/worldcup.json';
 var allScorers = {};
 var curPage = 'overview';
 var mFilter = 'all';
@@ -446,96 +444,68 @@ function teamsMatch(name1, name2) {
   return false;
 }
 
-function matchFixture(ev) {
+function matchFixture(team1, team2) {
   return FIXTURES.find(function(f) {
-    return teamsMatch(f.home, ev.strHomeTeam) && teamsMatch(f.away, ev.strAwayTeam);
+    return (teamsMatch(f.home, team1) && teamsMatch(f.away, team2))
+        || (teamsMatch(f.home, team2) && teamsMatch(f.away, team1));
   });
 }
 
 // ═══════════════════════════════════════════════════
-// API LOADING
+// TIME PARSING — "13:00 UTC-6" → UTC "19:00"
+// ═══════════════════════════════════════════════════
+function parseApiTime(timeStr) {
+  if (!timeStr) return null;
+  var m = timeStr.match(/(\d{2}):(\d{2})\s*UTC([+-]?\d+)?/);
+  if (!m) return timeStr.substring(0, 5);
+  var hh = parseInt(m[1]);
+  var mm = parseInt(m[2]);
+  var offset = m[3] ? parseInt(m[3]) : 0;
+  var utcHH = hh - offset;
+  while (utcHH < 0) utcHH += 24;
+  while (utcHH >= 24) utcHH -= 24;
+  return (utcHH < 10 ? '0' : '') + utcHH + ':' + (mm < 10 ? '0' : '') + mm;
+}
+
+// ═══════════════════════════════════════════════════
+// API LOADING (openfootball/worldcup.json)
 // ═══════════════════════════════════════════════════
 function loadAll() {
-  setApi('spin', 'API...');
-  fetch(API_BASE + '/eventsseason.php?id=' + LEAGUE_ID + '&s=2025-2026')
-    .then(function(r) { return r.json(); })
+  setApi('spin', 'Yuklanmoqda...');
+  fetch(DATA_URL)
+    .then(function(r) {
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      return r.json();
+    })
     .then(function(data) {
-      var events = data.events || [];
-      var matched = 0;
-      events.forEach(function(ev) {
-        var fix = matchFixture(ev);
+      var matches = data.matches || [];
+      var scheduled = 0, results = 0;
+      matches.forEach(function(m) {
+        if (!m.group) return; // knockout o'yinlarini hozircha o'tkazamiz
+        var fix = matchFixture(m.team1, m.team2);
         if (!fix) return;
-        fix.apiId = ev.idEvent;
-        // Jadval ma'lumotlarini API dan olish
-        if (ev.dateEvent) fix.date = ev.dateEvent;
-        if (ev.strTime) fix.time = ev.strTime.substring(0, 5);
-        if (ev.strVenue) fix.venue = ev.strVenue;
-        // Natijalarni olish
-        if (ev.intHomeScore !== null && ev.intHomeScore !== '' && ev.intHomeScore !== undefined) {
-          fix.homeScore = parseInt(ev.intHomeScore);
-          fix.awayScore = (ev.intAwayScore !== null && ev.intAwayScore !== '' && ev.intAwayScore !== undefined)
-            ? parseInt(ev.intAwayScore) : 0;
-          fix.status = ev.strStatus || 'FT';
-          matched++;
-        } else {
-          fix.status = ev.strStatus || 'NS';
+        // Jadval ma'lumotlari
+        if (m.date) { fix.date = m.date; scheduled++; }
+        if (m.time) fix.time = parseApiTime(m.time);
+        if (m.ground) fix.venue = m.ground;
+        // Natijalar (turnir boshlanganida JSON da paydo bo'ladi)
+        if (m.score1 !== undefined && m.score1 !== null) {
+          fix.homeScore = parseInt(m.score1);
+          fix.awayScore = (m.score2 !== undefined && m.score2 !== null) ? parseInt(m.score2) : 0;
+          fix.status = 'FT';
+          results++;
         }
       });
-      setApi('ok', events.length + " o'yin · " + matched + ' natija');
+      setApi('ok', scheduled + ' jadval · ' + results + ' natija');
       renderAll();
       if (curPage === 'groups') renderGroups();
       if (curPage === 'matches') renderMatches();
-      loadAllScorers();
     })
     .catch(function(e) {
-      setApi('err', 'API xatosi');
-      showToast("API ga ulanib bo'lmadi", true);
+      setApi('err', "Ma'lumot yuklanmadi");
+      showToast("API ga ulanib bo'lmadi: " + e.message, true);
       renderAll();
     });
-}
-
-function loadAllScorers() {
-  var finished = FIXTURES.filter(function(f) { return f.apiId && f.homeScore !== null; });
-  var i = 0;
-  function next() {
-    if (i >= finished.length) {
-      buildScorerTotals();
-      if (curPage === 'scorers') renderScorers();
-      return;
-    }
-    var batch = finished.slice(i, i + 3);
-    i += 3;
-    var promises = batch.map(function(f) { return loadEventScorers(f); });
-    Promise.all(promises).then(function() {
-      setTimeout(next, 300);
-    });
-  }
-  next();
-}
-
-function loadEventScorers(fix) {
-  return fetch(API_BASE + '/eventresults.php?id=' + fix.apiId)
-    .then(function(r) { return r.json(); })
-    .then(function(data) {
-      fix.homeScorers = [];
-      fix.awayScorers = [];
-      (data.results || []).forEach(function(r) {
-        if (!r.strPlayer) return;
-        var entry = { name: r.strPlayer, time: r.intResult || '', type: r.strResultType || 'Goal' };
-        var teamLow = (r.strTeam || '').toLowerCase();
-        var homeLow = fix.home.toLowerCase().split(' ')[0];
-        if (teamLow.indexOf(homeLow) >= 0) fix.homeScorers.push(entry);
-        else fix.awayScorers.push(entry);
-      });
-    })
-    .catch(function() {});
-}
-
-function loadEventStats(fix) {
-  return fetch(API_BASE + '/lookupeventstats.php?id=' + fix.apiId)
-    .then(function(r) { return r.json(); })
-    .then(function(data) { fix.stats = data.eventstats || null; })
-    .catch(function() {});
 }
 
 function buildScorerTotals() {
@@ -743,15 +713,9 @@ function openDrawer(fixId) {
   document.getElementById('drawer-title').textContent = 'Guruh ' + f.group + (f.date ? ' · ' + fmtDate(f.date) : '');
   document.getElementById('drawer-overlay').classList.add('open');
   renderDrawerContent(f, false);
-
-  if (f.apiId && f.homeScore !== null && !f.stats) {
-    loadEventStats(f).then(function() {
-      if (openDrawerId === fixId) renderDrawerContent(f, true);
-    });
-  }
 }
 
-function renderDrawerContent(f, withStats) {
+function renderDrawerContent(f) {
   var done = f.homeScore !== null;
   var sl = statusLabel(f);
 
@@ -773,19 +737,8 @@ function renderDrawerContent(f, withStats) {
           + '</div>';
       }).join('');
     } else {
-      scorersHtml += '<div style="font-size:.78rem;color:var(--grey);padding:.5rem 0">API da gol ma\'lumoti yo\'q</div>';
+      scorersHtml += '<div style="font-size:.78rem;color:var(--grey);padding:.5rem 0">Gol ma\'lumoti hali mavjud emas</div>';
     }
-  }
-
-  var statsHtml = '';
-  if (withStats && f.stats && f.stats.length) {
-    statsHtml = '<div class="dsec">📊 Statistika</div><table class="statstbl">'
-      + f.stats.map(function(s) {
-          return '<tr><td>' + (s.intHome||0) + '</td>'
-            + '<td style="text-align:center;color:var(--grey);font-size:.62rem;text-transform:uppercase;letter-spacing:.05em">' + s.strStat + '</td>'
-            + '<td style="text-align:right">' + (s.intAway||0) + '</td></tr>';
-        }).join('')
-      + '</table>';
   }
 
   document.getElementById('drawer-body').innerHTML =
@@ -800,8 +753,7 @@ function renderDrawerContent(f, withStats) {
     + '<div class="dmeta-item"><div class="dmeta-label">Stadion</div><div class="dmeta-val">' + esc(f.venue || '—') + '</div></div>'
     + '<div class="dmeta-item"><div class="dmeta-label">Holat</div><div class="dmeta-val"><span class="stbadge ' + sl[0] + '">' + sl[1] + '</span></div></div>'
     + '</div>'
-    + scorersHtml
-    + statsHtml;
+    + scorersHtml;
 }
 
 function closeDrawer() {
