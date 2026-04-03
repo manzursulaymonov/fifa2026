@@ -4,6 +4,10 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>FIFA 2026 — Turnir Kuzatuvi</title>
+<meta name="theme-color" content="#081f11">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="description" content="FIFA Jahon Chempionati 2026 — guruhlar, natijalar, to'purarlar">
+<link rel="manifest" href="manifest.json">
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
 :root {
@@ -77,6 +81,8 @@ main { position: relative; z-index: 1; max-width: 1440px; margin: 0 auto; paddin
 .fscore.pend .pend-date { font-size: .68rem; color: var(--grey); font-family: 'DM Mono'; }
 .fscore.pend .pend-time { font-size: 1rem; color: var(--gold); font-family: 'Bebas Neue'; letter-spacing: .06em; }
 .faway { display: flex; align-items: center; justify-content: flex-start; gap: .5rem; padding: .65rem .8rem; font-weight: 600; font-size: .88rem; }
+.team-link { cursor: pointer; transition: color .15s; }
+.team-link:hover { color: var(--gold); text-decoration: underline; }
 .fright { padding: .65rem .8rem; border-left: 1px solid var(--border2); display: flex; flex-direction: column; align-items: flex-end; justify-content: center; gap: .3rem; }
 .grpbadge { font-family: 'Bebas Neue'; font-size: .85rem; letter-spacing: .08em; color: var(--gold); background: rgba(240,192,64,.08); padding: .1rem .45rem; border-radius: 4px; border: 1px solid rgba(240,192,64,.15); }
 .stbadge { font-size: .58rem; font-weight: 700; text-transform: uppercase; letter-spacing: .07em; padding: .15rem .45rem; border-radius: 3px; }
@@ -163,34 +169,140 @@ select option { background: var(--green2); color: var(--white); }
 .empty { text-align: center; padding: 2.5rem; color: var(--grey); font-size: .88rem; }
 .eic { font-size: 2rem; margin-bottom: .55rem; opacity: .4; }
 
+/* PLAYOFF BRACKET */
+.bracket { display: flex; flex-direction: column; gap: 1.5rem; }
+.bracket-round { margin-bottom: .5rem; }
+.bracket-title { font-family: 'Bebas Neue'; font-size: 1.1rem; letter-spacing: .08em; color: var(--gold); margin-bottom: .7rem; display: flex; align-items: center; gap: .5rem; }
+.bracket-title::after { content: ''; flex: 1; height: 1px; background: linear-gradient(90deg, var(--gold2), transparent); opacity: .25; }
+.bracket-games { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: .6rem; }
+.ko-card { background: var(--card); border: 1px solid var(--border); border-radius: 9px; padding: .7rem .9rem; cursor: pointer; transition: border-color .18s; }
+.ko-card:hover { border-color: rgba(240,192,64,.35); }
+.ko-teams { display: flex; align-items: center; gap: .5rem; }
+.ko-vs { color: var(--grey); font-size: .7rem; margin: 0 .2rem; }
+.ko-score { font-family: 'Bebas Neue'; font-size: 1.2rem; color: var(--gold); margin-left: auto; white-space: nowrap; }
+.ko-meta { display: flex; gap: .6rem; margin-top: .35rem; font-size: .62rem; color: var(--grey); font-family: 'DM Mono'; }
+
+/* SEARCH */
+.search-wrap { position: relative; }
+.search-input { background: rgba(0,0,0,.25); border: 1px solid var(--border2); color: var(--white); padding: .35rem .7rem .35rem 1.8rem; border-radius: 8px; font-family: 'DM Sans'; font-size: .75rem; width: 180px; outline: none; transition: border-color .18s; }
+.search-input:focus { border-color: var(--gold2); }
+.search-input::placeholder { color: var(--grey); }
+.search-icon { position: absolute; left: .55rem; top: 50%; transform: translateY(-50%); font-size: .75rem; color: var(--grey); pointer-events: none; }
+.search-results { position: absolute; top: 100%; left: 0; right: 0; background: var(--green2); border: 1px solid var(--border); border-radius: 8px; margin-top: .3rem; z-index: 50; max-height: 260px; overflow-y: auto; display: none; }
+.search-results.open { display: block; }
+.search-item { padding: .5rem .75rem; font-size: .78rem; cursor: pointer; display: flex; align-items: center; gap: .5rem; border-bottom: 1px solid var(--border2); transition: background .12s; }
+.search-item:last-child { border-bottom: none; }
+.search-item:hover { background: rgba(255,255,255,.04); }
+.search-item .si-type { font-size: .6rem; color: var(--grey); font-family: 'DM Mono'; text-transform: uppercase; margin-left: auto; }
+
+/* FAVORITES */
+.fav-star { cursor: pointer; font-size: .9rem; opacity: .3; transition: opacity .15s; flex-shrink: 0; user-select: none; }
+.fav-star:hover { opacity: .7; }
+.fav-star.active { opacity: 1; color: var(--gold); }
+.fav-sec { margin-bottom: 1.5rem; }
+
+/* THEME TOGGLE */
+.theme-btn { background: none; border: 1px solid var(--border2); color: var(--grey); width: 32px; height: 32px; border-radius: 50%; cursor: pointer; font-size: .85rem; display: flex; align-items: center; justify-content: center; transition: all .18s; flex-shrink: 0; }
+.theme-btn:hover { color: var(--white); border-color: var(--gold2); }
+
+/* TEAM DRAWER */
+.td-stats { display: grid; grid-template-columns: repeat(3,1fr); gap: .45rem; margin: .75rem 0; }
+.td-stat { background: rgba(255,255,255,.03); border: 1px solid var(--border2); border-radius: 8px; padding: .5rem; text-align: center; }
+.td-stat-val { font-family: 'Bebas Neue'; font-size: 1.4rem; color: var(--gold); line-height: 1; }
+.td-stat-lbl { font-size: .58rem; color: var(--grey); text-transform: uppercase; letter-spacing: .08em; margin-top: .15rem; }
+.td-match { display: flex; align-items: center; gap: .5rem; padding: .45rem 0; border-bottom: 1px solid var(--border2); font-size: .8rem; }
+.td-match:last-child { border-bottom: none; }
+.td-match-score { font-family: 'Bebas Neue'; font-size: 1.1rem; color: var(--gold); min-width: 50px; text-align: center; }
+.td-match-date { font-size: .65rem; color: var(--grey); font-family: 'DM Mono'; margin-left: auto; }
+
+/* LIGHT THEME */
+body.light { background: #f0ede6; color: #1a2a1f; }
+body.light::before { background: none; }
+body.light header { background: rgba(255,255,255,.85); border-bottom-color: rgba(0,0,0,.08); }
+body.light .logo { color: #8b6914; }
+body.light .logo em { color: #1a2a1f; }
+body.light nav button { color: #6b7f72; }
+body.light nav button:hover { color: #1a2a1f; background: rgba(0,0,0,.04); }
+body.light nav button.act { color: #8b6914; background: rgba(139,105,20,.08); border-color: rgba(139,105,20,.18); }
+body.light .apipill { background: rgba(0,0,0,.04); border-color: rgba(0,0,0,.08); color: #6b7f72; }
+body.light .sc, body.light .fcard, body.light .gc, body.light .scorerrow, body.light .ko-card { background: rgba(255,255,255,.7); border-color: rgba(0,0,0,.08); }
+body.light .sec, body.light .gname, body.light .bracket-title { color: #8b6914; }
+body.light .sec::after, body.light .bracket-title::after { background: linear-gradient(90deg, #c9a227, transparent); }
+body.light .sv, body.light .fscore, body.light .dscore, body.light .ko-score { color: #8b6914; }
+body.light .sl, body.light .ss, body.light .fdate, body.light .goal-min { color: #6b7f72; }
+body.light .fhome, body.light .faway, body.light .dteam-name { color: #1a2a1f; }
+body.light .drawer { background: #f5f2eb; border-color: rgba(0,0,0,.1); }
+body.light .drawer-overlay { background: rgba(0,0,0,.35); }
+body.light .dmeta-item, body.light .td-stat { background: rgba(0,0,0,.03); border-color: rgba(0,0,0,.06); }
+body.light .toast { background: #f5f2eb; }
+body.light .search-input { background: rgba(0,0,0,.04); border-color: rgba(0,0,0,.1); color: #1a2a1f; }
+body.light .search-results { background: #f5f2eb; border-color: rgba(0,0,0,.1); }
+body.light .search-item:hover { background: rgba(0,0,0,.04); }
+body.light .grpbadge { color: #8b6914; background: rgba(139,105,20,.08); border-color: rgba(139,105,20,.15); }
+body.light .gtbl td, body.light .gtbl th { border-bottom-color: rgba(0,0,0,.06); }
+body.light .gh { background: rgba(139,105,20,.05); border-bottom-color: rgba(0,0,0,.06); }
+body.light .date-group { color: #6b7f72; border-bottom-color: rgba(0,0,0,.06); }
+body.light .pts { color: #1a2a1f !important; }
+body.light .fb { background: rgba(255,255,255,.7); border-color: rgba(0,0,0,.08); color: #6b7f72; }
+body.light .fb.act, body.light .fb:hover { background: rgba(139,105,20,.1); border-color: #c9a227; color: #8b6914; }
+body.light select, body.light select option { background: #f5f2eb; color: #1a2a1f; border-color: rgba(0,0,0,.1); }
+
+/* A11Y — Focus */
+*:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; border-radius: 4px; }
+nav button, .fb, .drawer-close, .theme-btn, .fav-star { min-height: 36px; min-width: 36px; }
+nav button { padding: .5rem 1rem; }
+.fb { padding: .4rem .85rem; }
+.drawer-close { padding: .4rem; font-size: 1.3rem; }
+
+/* A11Y — Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
+}
+
 @media(max-width: 900px) {
   .fcard { grid-template-columns: 110px 1fr auto 1fr 80px; }
   .fvenue { display: none; }
+  .search-input { width: 140px; }
 }
 @media(max-width: 700px) {
   header { flex-direction: column; height: auto; padding: .7rem 1rem; gap: .4rem; }
+  .header-right { width: 100%; justify-content: center; }
   main { padding: .85rem 1rem; }
   .statbar { grid-template-columns: repeat(2,1fr); }
   .fcard { grid-template-columns: 1fr auto 1fr; }
   .fmeta, .fright { display: none; }
+  .fcard-mmeta { display: flex; }
   .dmeta-grid { grid-template-columns: 1fr; }
+  .search-input { width: 100%; }
+  .bracket-games { grid-template-columns: 1fr; }
 }
+/* Mobile meta — faqat mobilda ko'rinadi */
+.fcard-mmeta { display: none; font-size: .6rem; color: var(--grey); text-align: center; padding: .15rem .5rem .4rem; grid-column: 1 / -1; font-family: 'DM Mono'; background: rgba(0,0,0,.1); }
 </style>
 </head>
 <body>
 
 <header>
-  <div class="logo">⚽ FIFA 2026 <em>/ KUZATUV</em></div>
-  <nav>
+  <h1 class="logo">⚽ FIFA 2026 <em>/ KUZATUV</em></h1>
+  <nav aria-label="Asosiy navigatsiya">
     <button class="act" onclick="showPage('overview',this)">Umumiy</button>
     <button onclick="showPage('groups',this)">Guruhlar</button>
     <button onclick="showPage('matches',this)">O'yinlar</button>
+    <button onclick="showPage('playoff',this)">Playoff</button>
     <button onclick="showPage('scorers',this)">To'purarlar</button>
   </nav>
-  <div class="apipill" onclick="manualRefresh()" style="cursor:pointer" title="Bosib yangilash">
-    <div class="dot spin" id="dot"></div>
-    <span id="apilbl">Yuklanmoqda...</span>
-    <span style="font-size:.7rem;opacity:.5">↻</span>
+  <div style="display:flex;align-items:center;gap:.5rem" class="header-right">
+    <div class="search-wrap">
+      <span class="search-icon">🔍</span>
+      <input type="text" class="search-input" id="search-input" placeholder="Qidirish..." oninput="performSearch(this.value)" onfocus="performSearch(this.value)" aria-label="Qidirish">
+      <div class="search-results" id="search-results"></div>
+    </div>
+    <button class="theme-btn" onclick="toggleTheme()" title="Temani o'zgartirish" aria-label="Temani o'zgartirish" id="theme-btn">🌙</button>
+    <div class="apipill" onclick="manualRefresh()" style="cursor:pointer" title="Bosib yangilash" aria-live="polite">
+      <div class="dot spin" id="dot"></div>
+      <span id="apilbl">Yuklanmoqda...</span>
+      <span style="font-size:.7rem;opacity:.5">↻</span>
+    </div>
   </div>
 </header>
 
@@ -231,8 +343,15 @@ select option { background: var(--green2); color: var(--white); }
     <div id="allmatches" class="mlist"></div>
   </div>
 
+  <div id="page-playoff" class="page">
+    <h2 class="sec">Playoff Bosqichi</h2>
+    <div id="playoff-content" class="bracket">
+      <div class="empty"><div class="eic">🏆</div>Playoff jadvali turnir davomida paydo bo'ladi</div>
+    </div>
+  </div>
+
   <div id="page-scorers" class="page">
-    <div class="sec">To'purarlar</div>
+    <h2 class="sec">To'purarlar</h2>
     <div style="background:rgba(240,192,64,.06);border:1px solid var(--border);border-radius:8px;padding:.75rem 1rem;margin-bottom:1.25rem;font-size:.8rem;color:var(--offwhite)">
       ⚽ Gol ma'lumotlari turnir boshlanishi bilan avtomatik yuklanadi (11-iyun 2026).
     </div>
@@ -243,11 +362,11 @@ select option { background: var(--green2); color: var(--white); }
   </div>
 </main>
 
-<div class="drawer-overlay" id="drawer-overlay">
+<div class="drawer-overlay" id="drawer-overlay" role="dialog" aria-modal="true" aria-labelledby="drawer-title">
   <div class="drawer">
     <div class="drawer-head">
       <div style="font-family:'Bebas Neue';font-size:1.1rem;letter-spacing:.08em;color:var(--gold)" id="drawer-title">O'YIN TAFSILOTI</div>
-      <button class="drawer-close" onclick="closeDrawer()">✕</button>
+      <button class="drawer-close" onclick="closeDrawer()" aria-label="Yopish">✕</button>
     </div>
     <div class="drawer-body" id="drawer-body">
       <div class="skel" style="height:120px"></div>
@@ -255,7 +374,7 @@ select option { background: var(--green2); color: var(--white); }
   </div>
 </div>
 
-<div class="toast" id="toast"></div>
+<div class="toast" id="toast" role="alert" aria-live="assertive"></div>
 
 <script>
 // ═══════════════════════════════════════════════════
@@ -525,6 +644,22 @@ function loadAll() {
           fix.awayScorers = g2;
         }
       });
+      // Knockout o'yinlarini parse qilish
+      KNOCKOUTS = [];
+      matches.forEach(function(m) {
+        if (m.group) return;
+        if (!m.round) return;
+        KNOCKOUTS.push({
+          round: m.round,
+          num: m.num || null,
+          team1: m.team1 || null,
+          team2: m.team2 || null,
+          date: m.date || null,
+          time: m.time ? parseApiTime(m.time) : null,
+          venue: m.ground || null,
+          score: m.score || null
+        });
+      });
       // Golchilar jadvalini yangilash
       buildScorerTotals();
       var now = new Date();
@@ -534,6 +669,7 @@ function loadAll() {
       if (curPage === 'groups') renderGroups();
       if (curPage === 'matches') renderMatches();
       if (curPage === 'scorers') renderScorers();
+      if (curPage === 'playoff') renderPlayoff();
       // Auto-refresh
       scheduleRefresh();
     })
@@ -627,6 +763,12 @@ function fixtureCard(f, showGroup) {
   } else {
     scoreContent = '<span class="pend-date">VS</span>';
   }
+  // Mobil meta — faqat kichik ekranlarda ko'rinadi
+  var mobileMetaStr = '';
+  if (f.date) {
+    mobileMetaStr = fmtDate(f.date) + (f.time ? ' · ' + fmtTime(f.time) : '');
+  }
+  if (venue) mobileMetaStr += (mobileMetaStr ? ' · ' : '') + venue;
   return '<div class="fcard" onclick="openDrawer(\'' + f.id + '\')">'
     + '<div class="fmeta">'
     +   '<div class="fdate">' + (f.date ? fmtDate(f.date) : '—') + '</div>'
@@ -634,7 +776,7 @@ function fixtureCard(f, showGroup) {
     +   '<div class="fvenue">' + esc(venue) + '</div>'
     + '</div>'
     + '<div class="fhome">'
-    +   '<span>' + esc(f.home) + '</span>'
+    +   '<span class="team-link" onclick="event.stopPropagation();openTeamDrawer(\'' + esc(f.home).replace(/'/g,'\\\'') + '\')">' + esc(f.home) + '</span>'
     +   flagImg(f.home, 26)
     + '</div>'
     + '<div class="fscore' + (done ? '' : ' pend') + '">'
@@ -642,16 +784,25 @@ function fixtureCard(f, showGroup) {
     + '</div>'
     + '<div class="faway">'
     +   flagImg(f.away, 26)
-    +   '<span>' + esc(f.away) + '</span>'
+    +   '<span class="team-link" onclick="event.stopPropagation();openTeamDrawer(\'' + esc(f.away).replace(/'/g,'\\\'') + '\')">' + esc(f.away) + '</span>'
     + '</div>'
     + '<div class="fright">'
     +   (showGroup ? '<span class="grpbadge">Guruh ' + f.group + '</span>' : '')
     +   '<span class="stbadge ' + stClass + '">' + stText + '</span>'
     + '</div>'
+    + (mobileMetaStr ? '<div class="fcard-mmeta">' + esc(mobileMetaStr) + '</div>' : '')
     + '</div>';
 }
 
 function renderOverviewLists() {
+  // Sevimlilar bo'limi
+  var favEl = document.getElementById('fav-section');
+  if (favEl) favEl.outerHTML = renderFavSection();
+  else {
+    var favHtml = renderFavSection();
+    if (favHtml) document.getElementById('upcoming-list').insertAdjacentHTML('beforebegin', favHtml);
+  }
+
   var upcoming = FIXTURES
     .filter(function(f) { return f.homeScore === null; })
     .sort(function(a,b) {
@@ -858,6 +1009,7 @@ function showPage(page, btn) {
   curPage = page;
   if (page === 'groups') renderGroups();
   if (page === 'matches') renderMatches();
+  if (page === 'playoff') renderPlayoff();
   if (page === 'scorers') renderScorers();
 }
 
@@ -899,10 +1051,254 @@ document.addEventListener('keydown', function(e) {
 });
 
 // ═══════════════════════════════════════════════════
+// KNOCKOUT / PLAYOFF
+// ═══════════════════════════════════════════════════
+var KNOCKOUTS = [];
+var ROUND_ORDER = ['Round of 32','Round of 16','Quarter-final','Semi-final','Match for third place','Final'];
+var ROUND_LABELS = {'Round of 32':'32 lik bosqich','Round of 16':'16 lik bosqich','Quarter-final':'Chorak final','Semi-final':'Yarim final','Match for third place':'3-o\'rin uchun','Final':'FINAL'};
+
+function renderPlayoff() {
+  if (!KNOCKOUTS.length) {
+    document.getElementById('playoff-content').innerHTML =
+      '<div class="empty"><div class="eic">🏆</div>Playoff jadvali turnir davomida paydo bo\'ladi</div>';
+    return;
+  }
+  var byRound = {};
+  KNOCKOUTS.forEach(function(k) {
+    if (!byRound[k.round]) byRound[k.round] = [];
+    byRound[k.round].push(k);
+  });
+  var html = '';
+  ROUND_ORDER.forEach(function(r) {
+    if (!byRound[r]) return;
+    var games = byRound[r];
+    html += '<div class="bracket-round">'
+      + '<div class="bracket-title">' + (ROUND_LABELS[r] || r) + '</div>'
+      + '<div class="bracket-games">';
+    games.forEach(function(k) {
+      var hasScore = k.score && k.score.ft;
+      var t1 = k.team1 || '?';
+      var t2 = k.team2 || '?';
+      var scoreStr = hasScore ? k.score.ft[0] + ' — ' + k.score.ft[1] : 'VS';
+      html += '<div class="ko-card">'
+        + '<div class="ko-teams">'
+        +   flagImg(t1, 20) + ' <span>' + esc(t1) + '</span>'
+        +   '<span class="ko-vs">vs</span>'
+        +   flagImg(t2, 20) + ' <span>' + esc(t2) + '</span>'
+        +   '<span class="ko-score">' + scoreStr + '</span>'
+        + '</div>'
+        + '<div class="ko-meta">'
+        +   (k.date ? '<span>' + fmtDate(k.date) + '</span>' : '')
+        +   (k.time ? '<span>' + fmtTime(k.time) + '</span>' : '')
+        +   (k.venue ? '<span>' + esc(k.venue) + '</span>' : '')
+        + '</div>'
+        + '</div>';
+    });
+    html += '</div></div>';
+  });
+  document.getElementById('playoff-content').innerHTML = html;
+}
+
+// ═══════════════════════════════════════════════════
+// TEAM DRAWER
+// ═══════════════════════════════════════════════════
+function openTeamDrawer(teamName) {
+  openDrawerId = 'team-' + teamName;
+  document.getElementById('drawer-title').textContent = teamName;
+  document.getElementById('drawer-overlay').classList.add('open');
+  // Jamoa guruhini topish
+  var teamGroup = null;
+  Object.keys(GROUPS).forEach(function(g) {
+    if (GROUPS[g].teams.indexOf(teamName) >= 0) teamGroup = g;
+  });
+  // Jamoa o'yinlarini olish
+  var teamFixtures = FIXTURES.filter(function(f) { return f.home === teamName || f.away === teamName; });
+  // Statistika
+  var st = {p:0,w:0,d:0,l:0,gf:0,ga:0};
+  teamFixtures.forEach(function(f) {
+    if (f.homeScore === null) return;
+    st.p++;
+    var isHome = f.home === teamName;
+    var gf = isHome ? f.homeScore : f.awayScore;
+    var ga = isHome ? f.awayScore : f.homeScore;
+    st.gf += gf; st.ga += ga;
+    if (gf > ga) st.w++;
+    else if (gf < ga) st.l++;
+    else st.d++;
+  });
+  // Guruh o'rni
+  var pos = '—';
+  if (teamGroup) {
+    var stand = standings(teamGroup);
+    for (var i = 0; i < stand.length; i++) {
+      if (stand[i].name === teamName) { pos = (i+1) + '-o\'rin'; break; }
+    }
+  }
+  // Jamoa golchilari
+  var teamScorers = [];
+  teamFixtures.forEach(function(f) {
+    var scorers = f.home === teamName ? f.homeScorers : f.awayScorers;
+    scorers.forEach(function(s) {
+      if (s.type === 'OG') return;
+      var existing = teamScorers.find(function(x) { return x.name === s.name; });
+      if (existing) existing.goals++;
+      else teamScorers.push({name: s.name, goals: 1});
+    });
+  });
+  teamScorers.sort(function(a,b) { return b.goals - a.goals; });
+  // Render
+  var favClass = favorites.indexOf(teamName) >= 0 ? ' active' : '';
+  var html = '<div style="text-align:center;margin-bottom:.75rem">'
+    + flagImg(teamName, 56)
+    + '<div style="font-weight:700;font-size:1.1rem;margin-top:.4rem">' + esc(teamName)
+    + ' <span class="fav-star' + favClass + '" onclick="toggleFavorite(\'' + esc(teamName).replace(/'/g,'\\\'') + '\',this)">★</span></div>'
+    + (teamGroup ? '<div style="font-size:.72rem;color:var(--grey)">Guruh ' + teamGroup + ' · ' + pos + '</div>' : '')
+    + '</div>';
+  html += '<div class="td-stats">'
+    + '<div class="td-stat"><div class="td-stat-val">' + st.p + '</div><div class="td-stat-lbl">O\'yin</div></div>'
+    + '<div class="td-stat"><div class="td-stat-val">' + st.w + '-' + st.d + '-' + st.l + '</div><div class="td-stat-lbl">G / D / M</div></div>'
+    + '<div class="td-stat"><div class="td-stat-val">' + st.gf + ':' + st.ga + '</div><div class="td-stat-lbl">Gol</div></div>'
+    + '</div>';
+  // O'yinlar ro'yxati
+  html += '<div class="dsec">📋 O\'yinlar</div>';
+  teamFixtures.sort(function(a,b) {
+    var da = a.date || '9999', db = b.date || '9999';
+    return da.localeCompare(db);
+  }).forEach(function(f) {
+    var isHome = f.home === teamName;
+    var opponent = isHome ? f.away : f.home;
+    var scoreStr = f.homeScore !== null
+      ? (isHome ? f.homeScore + ' — ' + f.awayScore : f.awayScore + ' — ' + f.homeScore)
+      : 'VS';
+    html += '<div class="td-match">'
+      + flagImg(opponent, 18)
+      + '<span>' + (isHome ? 'vs ' : '@ ') + esc(opponent) + '</span>'
+      + '<span class="td-match-score">' + scoreStr + '</span>'
+      + '<span class="td-match-date">' + (f.date ? fmtDate(f.date) : '—') + '</span>'
+      + '</div>';
+  });
+  // Golchilar
+  if (teamScorers.length) {
+    html += '<div class="dsec">⚽ Golchilar</div>';
+    teamScorers.forEach(function(s) {
+      html += '<div class="goal-row"><span class="goal-player">' + esc(s.name) + '</span><span class="goal-min">' + s.goals + ' gol</span></div>';
+    });
+  }
+  document.getElementById('drawer-body').innerHTML = html;
+}
+
+// ═══════════════════════════════════════════════════
+// SEARCH
+// ═══════════════════════════════════════════════════
+function performSearch(query) {
+  var container = document.getElementById('search-results');
+  if (!query || query.length < 2) { container.classList.remove('open'); return; }
+  var q = query.toLowerCase();
+  var results = [];
+  // Jamoalar
+  getAllTeams().forEach(function(t) {
+    if (t.toLowerCase().indexOf(q) >= 0) results.push({type: 'Jamoa', name: t, action: 'team'});
+  });
+  // Stadionlar
+  var venues = {};
+  FIXTURES.forEach(function(f) { if (f.venue && f.venue.toLowerCase().indexOf(q) >= 0) venues[f.venue] = f.id; });
+  Object.keys(venues).forEach(function(v) {
+    results.push({type: 'Stadion', name: v, action: 'match', id: venues[v]});
+  });
+  // Guruhlar
+  Object.keys(GROUPS).forEach(function(g) {
+    if (('guruh ' + g).toLowerCase().indexOf(q) >= 0) results.push({type: 'Guruh', name: 'Guruh ' + g, action: 'group', group: g});
+  });
+  if (!results.length) { container.classList.remove('open'); return; }
+  container.innerHTML = results.slice(0, 8).map(function(r, i) {
+    var onclick = '';
+    if (r.action === 'team') onclick = 'searchSelect(\'team\',\'' + esc(r.name).replace(/'/g,'\\\'') + '\')';
+    else if (r.action === 'match') onclick = 'searchSelect(\'match\',\'' + r.id + '\')';
+    else if (r.action === 'group') onclick = 'searchSelect(\'group\',\'' + r.group + '\')';
+    return '<div class="search-item" onclick="' + onclick + '">'
+      + (r.action === 'team' ? flagImg(r.name, 18) : '')
+      + '<span>' + esc(r.name) + '</span>'
+      + '<span class="si-type">' + r.type + '</span></div>';
+  }).join('');
+  container.classList.add('open');
+}
+
+function searchSelect(type, val) {
+  document.getElementById('search-input').value = '';
+  document.getElementById('search-results').classList.remove('open');
+  if (type === 'team') {
+    openTeamDrawer(val);
+  } else if (type === 'match') {
+    openDrawer(val);
+  } else if (type === 'group') {
+    showPage('groups', document.querySelectorAll('nav button')[1]);
+  }
+}
+
+// Tashqarida bosilganda search yopilsin
+document.addEventListener('click', function(e) {
+  if (!e.target.closest('.search-wrap')) {
+    document.getElementById('search-results').classList.remove('open');
+  }
+});
+
+// ═══════════════════════════════════════════════════
+// FAVORITES
+// ═══════════════════════════════════════════════════
+var favorites = JSON.parse(localStorage.getItem('fifa2026_fav') || '[]');
+
+function toggleFavorite(team, el) {
+  var idx = favorites.indexOf(team);
+  if (idx >= 0) { favorites.splice(idx, 1); if (el) el.classList.remove('active'); }
+  else { favorites.push(team); if (el) el.classList.add('active'); }
+  localStorage.setItem('fifa2026_fav', JSON.stringify(favorites));
+  if (curPage === 'overview') renderOverviewLists();
+}
+
+function renderFavSection() {
+  if (!favorites.length) return '';
+  var favFixtures = FIXTURES.filter(function(f) {
+    return favorites.indexOf(f.home) >= 0 || favorites.indexOf(f.away) >= 0;
+  }).filter(function(f) { return f.homeScore === null; })
+    .sort(function(a,b) {
+      var da = a.date || '9999', db = b.date || '9999';
+      return da.localeCompare(db);
+    }).slice(0, 4);
+  if (!favFixtures.length) return '';
+  return '<div class="fav-sec"><div class="sec" style="font-size:1.2rem">★ Sevimlilar</div>'
+    + '<div class="mlist">'
+    + favFixtures.map(function(f) { return fixtureCard(f, true); }).join('')
+    + '</div></div>';
+}
+
+// ═══════════════════════════════════════════════════
+// THEME
+// ═══════════════════════════════════════════════════
+function initTheme() {
+  var saved = localStorage.getItem('fifa2026_theme');
+  if (saved === 'light') {
+    document.body.classList.add('light');
+    document.getElementById('theme-btn').textContent = '☀️';
+  }
+}
+
+function toggleTheme() {
+  var isLight = document.body.classList.toggle('light');
+  document.getElementById('theme-btn').textContent = isLight ? '☀️' : '🌙';
+  localStorage.setItem('fifa2026_theme', isLight ? 'light' : 'dark');
+}
+
+// ═══════════════════════════════════════════════════
 // INIT
 // ═══════════════════════════════════════════════════
+initTheme();
 renderAll();
 loadAll();
+
+// PWA Service Worker
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('sw.js').catch(function() {});
+}
 </script>
 </body>
 </html>

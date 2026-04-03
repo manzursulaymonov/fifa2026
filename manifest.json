@@ -1,0 +1,16 @@
+{
+  "name": "FIFA 2026 — Turnir Kuzatuvi",
+  "short_name": "FIFA 2026",
+  "description": "FIFA Jahon Chempionati 2026 — guruhlar, o'yinlar, natijalar va to'purarlar",
+  "start_url": "/index.html",
+  "display": "standalone",
+  "background_color": "#081f11",
+  "theme_color": "#081f11",
+  "icons": [
+    {
+      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚽</text></svg>",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ]
+}
