@@ -109,6 +109,7 @@ main { position: relative; z-index: 1; max-width: 1440px; margin: 0 auto; paddin
 .fbar { display: flex; gap: .35rem; margin-bottom: 1.1rem; flex-wrap: wrap; }
 .fb { background: var(--card); border: 1px solid var(--border); color: var(--grey); padding: .3rem .75rem; border-radius: 18px; font-size: .72rem; cursor: pointer; font-family: 'DM Sans'; transition: all .18s; font-weight: 500; }
 .fb.act, .fb:hover { background: rgba(240,192,64,.12); border-color: var(--gold2); color: var(--gold); }
+select option { background: var(--green2); color: var(--white); }
 
 /* SCORERS */
 .scorerlist { display: flex; flex-direction: column; gap: .45rem; }
@@ -221,6 +222,11 @@ main { position: relative; z-index: 1; max-width: 1440px; margin: 0 auto; paddin
 
   <div id="page-matches" class="page">
     <div class="sec">Barcha O'yinlar</div>
+    <div style="display:flex;gap:.6rem;align-items:center;margin-bottom:.75rem;flex-wrap:wrap">
+      <select id="teamfilter" onchange="setTeamFilter(this.value)" style="background:var(--card);border:1px solid var(--border);color:var(--white);padding:.38rem .7rem;border-radius:8px;font-family:'DM Sans';font-size:.78rem;cursor:pointer;min-width:180px;outline:none">
+        <option value="all">Barcha jamoalar</option>
+      </select>
+    </div>
     <div class="fbar" id="fbar"></div>
     <div id="allmatches" class="mlist"></div>
   </div>
@@ -401,6 +407,7 @@ var DATA_URL = 'https://raw.githubusercontent.com/openfootball/worldcup.json/mas
 var allScorers = {};
 var curPage = 'overview';
 var mFilter = 'all';
+var tFilter = 'all';
 var openDrawerId = null;
 
 function setApi(state, txt) {
@@ -691,14 +698,40 @@ function renderGroups() {
   }).join('');
 }
 
+function getAllTeams() {
+  var teams = [];
+  Object.keys(GROUPS).forEach(function(g) {
+    GROUPS[g].teams.forEach(function(t) { if (teams.indexOf(t) < 0) teams.push(t); });
+  });
+  return teams.sort();
+}
+
+function renderTeamDropdown() {
+  var sel = document.getElementById('teamfilter');
+  if (!sel) return;
+  var current = sel.value;
+  var teams = getAllTeams();
+  sel.innerHTML = '<option value="all">Barcha jamoalar</option>'
+    + teams.map(function(t) {
+        return '<option value="' + esc(t) + '"' + (tFilter === t ? ' selected' : '') + '>' + t + '</option>';
+      }).join('');
+}
+
 function renderMatches() {
+  // Jamoa dropdown
+  renderTeamDropdown();
+
+  // Guruh filtri tugmalari
   var letters = ['all'].concat(Object.keys(GROUPS));
   document.getElementById('fbar').innerHTML = letters.map(function(g) {
     return '<button class="fb' + (mFilter === g ? ' act' : '') + '" onclick="setFilter(\'' + g + '\',this)">'
       + (g === 'all' ? 'Barchasi' : 'Guruh ' + g) + '</button>';
   }).join('');
 
-  var list = mFilter === 'all' ? FIXTURES : FIXTURES.filter(function(f) { return f.group === mFilter; });
+  // Filtrlash: guruh + jamoa
+  var list = FIXTURES;
+  if (mFilter !== 'all') list = list.filter(function(f) { return f.group === mFilter; });
+  if (tFilter !== 'all') list = list.filter(function(f) { return f.home === tFilter || f.away === tFilter; });
   list = list.slice().sort(function(a,b) {
     var da = a.date || '9999-99-99', db = b.date || '9999-99-99';
     return da.localeCompare(db) || (a.time || '').localeCompare(b.time || '');
@@ -832,6 +865,21 @@ function setFilter(g, btn) {
   mFilter = g;
   document.querySelectorAll('.fb').forEach(function(b) { b.classList.remove('act'); });
   if (btn) btn.classList.add('act');
+  renderMatches();
+}
+
+function setTeamFilter(team) {
+  tFilter = team;
+  // Jamoa tanlanganda guruh filtrini avtomatik moslashtirish
+  if (team !== 'all') {
+    var teamGroup = null;
+    Object.keys(GROUPS).forEach(function(g) {
+      if (GROUPS[g].teams.indexOf(team) >= 0) teamGroup = g;
+    });
+    if (teamGroup && mFilter !== 'all' && mFilter !== teamGroup) {
+      mFilter = 'all';
+    }
+  }
   renderMatches();
 }
 
