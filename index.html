@@ -186,9 +186,10 @@ main { position: relative; z-index: 1; max-width: 1440px; margin: 0 auto; paddin
     <button onclick="showPage('matches',this)">O'yinlar</button>
     <button onclick="showPage('scorers',this)">To'purarlar</button>
   </nav>
-  <div class="apipill">
+  <div class="apipill" onclick="manualRefresh()" style="cursor:pointer" title="Bosib yangilash">
     <div class="dot spin" id="dot"></div>
     <span id="apilbl">Yuklanmoqda...</span>
+    <span style="font-size:.7rem;opacity:.5">↻</span>
   </div>
 </header>
 
@@ -470,9 +471,12 @@ function parseApiTime(timeStr) {
 // ═══════════════════════════════════════════════════
 // API LOADING (openfootball/worldcup.json)
 // ═══════════════════════════════════════════════════
+var REFRESH_INTERVAL = 5 * 60 * 1000; // 5 daqiqa
+var refreshTimer = null;
+
 function loadAll() {
   setApi('spin', 'Yuklanmoqda...');
-  fetch(DATA_URL)
+  fetch(DATA_URL, {cache: 'no-cache'})
     .then(function(r) {
       if (!r.ok) throw new Error('HTTP ' + r.status);
       return r.json();
@@ -481,31 +485,67 @@ function loadAll() {
       var matches = data.matches || [];
       var scheduled = 0, results = 0;
       matches.forEach(function(m) {
-        if (!m.group) return; // knockout o'yinlarini hozircha o'tkazamiz
+        if (!m.group) return;
         var fix = matchFixture(m.team1, m.team2);
         if (!fix) return;
+        var isReversed = teamsMatch(fix.home, m.team2) && teamsMatch(fix.away, m.team1);
         // Jadval ma'lumotlari
         if (m.date) { fix.date = m.date; scheduled++; }
         if (m.time) fix.time = parseApiTime(m.time);
         if (m.ground) fix.venue = m.ground;
-        // Natijalar (turnir boshlanganida JSON da paydo bo'ladi)
-        if (m.score1 !== undefined && m.score1 !== null) {
-          fix.homeScore = parseInt(m.score1);
-          fix.awayScore = (m.score2 !== undefined && m.score2 !== null) ? parseInt(m.score2) : 0;
+        // Natijalar (score: {ft: [1,2], ht: [0,1]})
+        if (m.score && m.score.ft) {
+          var ft = m.score.ft;
+          fix.homeScore = isReversed ? ft[1] : ft[0];
+          fix.awayScore = isReversed ? ft[0] : ft[1];
+          fix.htScore = m.score.ht || null;
+          if (isReversed && fix.htScore) fix.htScore = [fix.htScore[1], fix.htScore[0]];
           fix.status = 'FT';
           results++;
         }
+        // Gol uruvchilar
+        var g1 = (m.goals1 || []).map(function(g) {
+          return {name: g.name, time: String(g.minute || ''), type: g.penalty ? 'Penalty' : g.owngoal ? 'OG' : 'Goal', offset: g.offset || 0};
+        });
+        var g2 = (m.goals2 || []).map(function(g) {
+          return {name: g.name, time: String(g.minute || ''), type: g.penalty ? 'Penalty' : g.owngoal ? 'OG' : 'Goal', offset: g.offset || 0};
+        });
+        if (isReversed) {
+          fix.homeScorers = g2;
+          fix.awayScorers = g1;
+        } else {
+          fix.homeScorers = g1;
+          fix.awayScorers = g2;
+        }
       });
-      setApi('ok', scheduled + ' jadval · ' + results + ' natija');
+      // Golchilar jadvalini yangilash
+      buildScorerTotals();
+      var now = new Date();
+      var timeStr = (now.getHours() < 10 ? '0' : '') + now.getHours() + ':' + (now.getMinutes() < 10 ? '0' : '') + now.getMinutes();
+      setApi('ok', scheduled + ' jadval · ' + results + ' natija · ' + timeStr);
       renderAll();
       if (curPage === 'groups') renderGroups();
       if (curPage === 'matches') renderMatches();
+      if (curPage === 'scorers') renderScorers();
+      // Auto-refresh
+      scheduleRefresh();
     })
     .catch(function(e) {
       setApi('err', "Ma'lumot yuklanmadi");
       showToast("API ga ulanib bo'lmadi: " + e.message, true);
       renderAll();
+      scheduleRefresh();
     });
+}
+
+function scheduleRefresh() {
+  if (refreshTimer) clearTimeout(refreshTimer);
+  refreshTimer = setTimeout(loadAll, REFRESH_INTERVAL);
+}
+
+function manualRefresh() {
+  if (refreshTimer) clearTimeout(refreshTimer);
+  loadAll();
 }
 
 function buildScorerTotals() {
@@ -712,28 +752,40 @@ function openDrawer(fixId) {
   openDrawerId = fixId;
   document.getElementById('drawer-title').textContent = 'Guruh ' + f.group + (f.date ? ' · ' + fmtDate(f.date) : '');
   document.getElementById('drawer-overlay').classList.add('open');
-  renderDrawerContent(f, false);
+  renderDrawerContent(f);
 }
 
 function renderDrawerContent(f) {
   var done = f.homeScore !== null;
   var sl = statusLabel(f);
 
+  // Yarim vaqt hisobi
+  var htHtml = '';
+  if (done && f.htScore) {
+    htHtml = '<div style="text-align:center;font-size:.72rem;color:var(--grey);margin-top:-.5rem;margin-bottom:.75rem">'
+      + 'Yarim vaqt: ' + f.htScore[0] + ' — ' + f.htScore[1] + '</div>';
+  }
+
+  // Golchilar
   var scorersHtml = '';
   if (done) {
-    var allGoals = f.homeScorers.map(function(s) { return {name:s.name,team:f.home,time:s.time,type:s.type}; })
-      .concat(f.awayScorers.map(function(s) { return {name:s.name,team:f.away,time:s.time,type:s.type}; }))
+    var allGoals = f.homeScorers.map(function(s) { return {name:s.name,team:f.home,time:s.time,type:s.type,offset:s.offset||0}; })
+      .concat(f.awayScorers.map(function(s) { return {name:s.name,team:f.away,time:s.time,type:s.type,offset:s.offset||0}; }))
       .sort(function(a,b) { return parseInt(a.time||0) - parseInt(b.time||0); });
 
     scorersHtml = '<div class="dsec">⚽ To\'purarlar</div>';
     if (allGoals.length) {
       scorersHtml += allGoals.map(function(g) {
+        var minStr = g.time ? g.time + (g.offset ? '+' + g.offset : '') + "'" : '—';
+        var typeLabel = '';
+        if (g.type === 'Penalty') typeLabel = 'pen.';
+        else if (g.type === 'OG') typeLabel = 'o.g.';
         return '<div class="goal-row">'
-          + '<span class="goal-min">' + (g.time ? esc(g.time) + "'" : '—') + '</span>'
+          + '<span class="goal-min">' + esc(minStr) + '</span>'
           + flagImg(g.team, 18)
           + '<span class="goal-player">' + esc(g.name) + '</span>'
           + '<span class="goal-team">' + esc(g.team) + '</span>'
-          + (g.type && g.type !== 'Goal' ? '<span class="goal-type">' + esc(g.type) + '</span>' : '')
+          + (typeLabel ? '<span class="goal-type">' + typeLabel + '</span>' : '')
           + '</div>';
       }).join('');
     } else {
@@ -747,6 +799,7 @@ function renderDrawerContent(f) {
     + '<div class="' + (done ? 'dscore' : 'dscore pend') + '">' + (done ? f.homeScore + ' — ' + f.awayScore : 'VS') + '</div>'
     + '<div class="dteam">' + flagImg(f.away, 48) + '<div class="dteam-name">' + esc(f.away) + '</div></div>'
     + '</div>'
+    + htHtml
     + '<div class="dmeta-grid">'
     + '<div class="dmeta-item"><div class="dmeta-label">Sana</div><div class="dmeta-val">' + (f.date ? fmtDate(f.date) : 'Kutilmoqda') + '</div></div>'
     + '<div class="dmeta-item"><div class="dmeta-label">Soat (mahalliy)</div><div class="dmeta-val">' + (f.time ? fmtTime(f.time) : '—') + '</div></div>'
