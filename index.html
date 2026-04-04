@@ -544,6 +544,10 @@ function esc(str) {
   return div.innerHTML;
 }
 
+function escAttr(str) {
+  return (str || '').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
 function flagImg(team, size) {
   var url = FLAGS[team];
   if (!url) return "";
@@ -551,7 +555,7 @@ function flagImg(team, size) {
   var h = Math.round(w * 0.75);
   return '<img src="' + url + '" width="' + w + '" height="' + h + '"'
     + ' style="object-fit:contain;flex-shrink:0;vertical-align:middle;border-radius:2px"'
-    + ' alt="' + esc(team) + '">';
+    + ' alt="' + escAttr(team) + '" loading="lazy">';
 }
 
 // DATE / TIME HELPERS
@@ -572,13 +576,20 @@ function fmtDate(dateStr) {
   return parts[2] + '.' + parts[1] + '.' + parts[0];
 }
 
-function fmtTime(timeStr) {
+function fmtTime(timeStr, dateStr) {
   if (!timeStr) return '—';
   var parts = timeStr.split(':');
   var hh = parseInt(parts[0]);
   var mm = parseInt(parts[1] || 0);
-  var now = new Date();
-  var d = new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate(), hh, mm, 0));
+  // dateStr mavjud bo'lsa, o'sha sananing DST offset'ini ishlatamiz
+  var ref;
+  if (dateStr) {
+    var dp = dateStr.split('-');
+    ref = new Date(parseInt(dp[0]), parseInt(dp[1]) - 1, parseInt(dp[2]));
+  } else {
+    ref = new Date();
+  }
+  var d = new Date(Date.UTC(ref.getFullYear(), ref.getMonth(), ref.getDate(), hh, mm, 0));
   var lh = d.getHours();
   var lm = d.getMinutes();
   return (lh < 10 ? '0' : '') + lh + ':' + (lm < 10 ? '0' : '') + lm;
@@ -824,20 +835,20 @@ function fixtureCard(f, showGroup) {
   if (done) {
     scoreContent = f.homeScore + ' &mdash; ' + f.awayScore;
   } else if (f.date) {
-    scoreContent = '<span class="pend-date">' + fmtDate(f.date) + '</span><span class="pend-time">' + fmtTime(f.time) + '</span>';
+    scoreContent = '<span class="pend-date">' + fmtDate(f.date) + '</span><span class="pend-time">' + fmtTime(f.time, f.date) + '</span>';
   } else {
     scoreContent = '<span class="pend-date">VS</span>';
   }
   // Mobil meta — faqat kichik ekranlarda ko'rinadi
   var mobileMetaStr = '';
   if (f.date) {
-    mobileMetaStr = fmtDate(f.date) + (f.time ? ' · ' + fmtTime(f.time) : '');
+    mobileMetaStr = fmtDate(f.date) + (f.time ? ' · ' + fmtTime(f.time, f.date) : '');
   }
   if (venue) mobileMetaStr += (mobileMetaStr ? ' · ' : '') + venue;
   return '<div class="fcard" onclick="openDrawer(\'' + f.id + '\')">'
     + '<div class="fmeta">'
     +   '<div class="fdate">' + (f.date ? fmtDate(f.date) : '—') + '</div>'
-    +   '<div class="ftime">' + (f.time ? fmtTime(f.time) : '') + '</div>'
+    +   '<div class="ftime">' + (f.time ? fmtTime(f.time, f.date) : '') + '</div>'
     +   '<div class="fvenue">' + esc(venue) + '</div>'
     + '</div>'
     + '<div class="fhome">'
@@ -862,9 +873,11 @@ function fixtureCard(f, showGroup) {
 function renderOverviewLists() {
   // Sevimlilar bo'limi
   var favEl = document.getElementById('fav-section');
-  if (favEl) favEl.outerHTML = renderFavSection();
-  else {
-    var favHtml = renderFavSection();
+  var favHtml = renderFavSection();
+  if (favEl) {
+    if (favHtml) { favEl.outerHTML = favHtml; }
+    else { favEl.remove(); }
+  } else {
     if (favHtml) document.getElementById('upcoming-list').insertAdjacentHTML('beforebegin', favHtml);
   }
 
@@ -1055,7 +1068,7 @@ function renderDrawerContent(f) {
     + htHtml
     + '<div class="dmeta-grid">'
     + '<div class="dmeta-item"><div class="dmeta-label">Sana</div><div class="dmeta-val">' + (f.date ? fmtDate(f.date) : 'Kutilmoqda') + '</div></div>'
-    + '<div class="dmeta-item"><div class="dmeta-label">Soat (mahalliy)</div><div class="dmeta-val">' + (f.time ? fmtTime(f.time) : '—') + '</div></div>'
+    + '<div class="dmeta-item"><div class="dmeta-label">Soat (mahalliy)</div><div class="dmeta-val">' + (f.time ? fmtTime(f.time, f.date) : '—') + '</div></div>'
     + '<div class="dmeta-item"><div class="dmeta-label">Stadion</div><div class="dmeta-val">' + esc(f.venue || '—') + '</div></div>'
     + '<div class="dmeta-item"><div class="dmeta-label">Holat</div><div class="dmeta-val"><span class="stbadge ' + sl[0] + '">' + sl[1] + '</span></div></div>'
     + '</div>'
@@ -1158,7 +1171,7 @@ function renderPlayoff() {
         + '</div>'
         + '<div class="ko-meta">'
         +   (k.date ? '<span>' + fmtDate(k.date) + '</span>' : '')
-        +   (k.time ? '<span>' + fmtTime(k.time) + '</span>' : '')
+        +   (k.time ? '<span>' + fmtTime(k.time, k.date) + '</span>' : '')
         +   (k.venue ? '<span>' + esc(k.venue) + '</span>' : '')
         + '</div>'
         + '</div>';
@@ -1300,7 +1313,10 @@ function searchSelect(type, val) {
   } else if (type === 'match') {
     openDrawer(val);
   } else if (type === 'group') {
-    showPage('groups', document.querySelectorAll('nav button')[1]);
+    var navBtns = document.querySelectorAll('nav button');
+    var grpBtn = null;
+    navBtns.forEach(function(b) { if (b.textContent.trim() === 'Guruhlar') grpBtn = b; });
+    showPage('groups', grpBtn || navBtns[1]);
   }
 }
 
