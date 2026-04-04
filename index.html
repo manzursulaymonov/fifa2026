@@ -20,7 +20,7 @@
   --border2: rgba(255,255,255,0.07);
 }
 * { box-sizing: border-box; margin: 0; padding: 0; }
-body { background: var(--green); color: var(--white); font-family: 'DM Sans', sans-serif; min-height: 100vh; }
+body { background: var(--green); color: var(--white); font-family: 'DM Sans', sans-serif; min-height: 100vh; overflow-x: hidden; }
 body::before {
   content: ''; position: fixed; inset: 0; pointer-events: none; z-index: 0;
   background:
@@ -303,8 +303,14 @@ nav button { padding: .5rem 1rem; }
   .search-input { width: 140px; }
 }
 @media(max-width: 700px) {
-  header { flex-direction: column; height: auto; padding: .7rem 1rem; gap: .4rem; }
-  .header-right { width: 100%; justify-content: center; }
+  header { flex-direction: column; height: auto; padding: .7rem 1rem; gap: .4rem; overflow: hidden; }
+  .logo { font-size: 1.25rem; }
+  .logo em { font-size: .65rem; }
+  nav { flex-wrap: wrap; justify-content: center; gap: .1rem; }
+  nav button { padding: .35rem .55rem; font-size: .68rem; }
+  .header-right { width: 100%; justify-content: center; flex-wrap: wrap; gap: .4rem; }
+  .apipill { font-size: .58rem; padding: .22rem .5rem; }
+  .apipill span:last-child { display: none; }
   main { padding: .85rem 1rem; }
   .statbar { grid-template-columns: repeat(2,1fr); }
   .fcard { grid-template-columns: 1fr auto 1fr; }
@@ -313,6 +319,16 @@ nav button { padding: .5rem 1rem; }
   .dmeta-grid { grid-template-columns: 1fr; }
   .search-input { width: 100%; }
   .bracket-games { grid-template-columns: 1fr; }
+}
+@media(max-width: 400px) {
+  header { padding: .5rem .7rem; }
+  .logo { font-size: 1.1rem; gap: .3rem; }
+  .logo em { display: none; }
+  nav button { padding: .3rem .4rem; font-size: .62rem; }
+  .search-input { font-size: .72rem; }
+  .apipill #apilbl { max-width: 60px; overflow: hidden; text-overflow: ellipsis; }
+  .sec { font-size: 1.3rem; }
+  .statbar { grid-template-columns: 1fr 1fr; gap: .5rem; }
 }
 /* Mobile meta — faqat mobilda ko'rinadi */
 .fcard-mmeta { display: none; font-size: .6rem; color: var(--grey); text-align: center; padding: .15rem .5rem .4rem; grid-column: 1 / -1; font-family: 'DM Mono'; background: rgba(0,0,0,.1); }
