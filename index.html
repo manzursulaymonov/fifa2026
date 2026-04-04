@@ -113,9 +113,12 @@ main { position: relative; z-index: 1; max-width: 1440px; margin: 0 auto; paddin
 
 /* FILTER */
 .fbar { display: flex; gap: .35rem; margin-bottom: 1.1rem; flex-wrap: wrap; }
+.fbar-mobile { display: none; width: 100%; padding: .45rem .7rem; border-radius: 8px; font-family: 'DM Sans'; font-size: .82rem; font-weight: 500; cursor: pointer; outline: none; background: var(--card); border: 1px solid var(--border); color: var(--white); margin-bottom: .75rem; }
 .fb { background: var(--card); border: 1px solid var(--border); color: var(--grey); padding: .3rem .75rem; border-radius: 18px; font-size: .72rem; cursor: pointer; font-family: 'DM Sans'; transition: all .18s; font-weight: 500; }
 .fb.act, .fb:hover { background: rgba(240,192,64,.12); border-color: var(--gold2); color: var(--gold); }
+.team-select { background: var(--card); border: 1px solid var(--border); color: var(--white); padding: .38rem .7rem; border-radius: 8px; font-family: 'DM Sans'; font-size: .78rem; cursor: pointer; min-width: 180px; outline: none; }
 select option { background: var(--green2); color: var(--white); }
+body.light .team-select { background: #f5f2eb; color: #1a2a1f; border-color: rgba(0,0,0,.1); }
 
 /* SCORERS */
 .scorerlist { display: flex; flex-direction: column; gap: .45rem; }
@@ -284,6 +287,7 @@ body.light .pts { color: #1a2a1f !important; }
 body.light .fb { background: rgba(255,255,255,.7); border-color: rgba(0,0,0,.08); color: #6b7f72; }
 body.light .fb.act, body.light .fb:hover { background: rgba(139,105,20,.1); border-color: #c9a227; color: #8b6914; }
 body.light select, body.light select option { background: #f5f2eb; color: #1a2a1f; border-color: rgba(0,0,0,.1); }
+body.light .fbar-mobile { background: #f5f2eb; color: #1a2a1f; border-color: rgba(0,0,0,.1); }
 
 /* A11Y — Focus */
 *:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; border-radius: 4px; }
@@ -316,6 +320,10 @@ nav button { padding: .5rem 1rem; }
   .fcard { grid-template-columns: 1fr auto 1fr; }
   .fmeta, .fright { display: none; }
   .fcard-mmeta { display: flex; }
+  .fbar { display: none; }
+  .fbar-mobile { display: block; }
+  .fhome, .faway { font-size: .78rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 38vw; }
+  .fscore.pend .pend-date { display: none; }
   .dmeta-grid { grid-template-columns: 1fr; }
   .search-input { width: 100%; }
   .bracket-games { grid-template-columns: 1fr; }
@@ -389,10 +397,11 @@ nav button { padding: .5rem 1rem; }
   <div id="page-matches" class="page">
     <div class="sec">Barcha O'yinlar</div>
     <div style="display:flex;gap:.6rem;align-items:center;margin-bottom:.75rem;flex-wrap:wrap">
-      <select id="teamfilter" onchange="setTeamFilter(this.value)" style="background:var(--card);border:1px solid var(--border);color:var(--white);padding:.38rem .7rem;border-radius:8px;font-family:'DM Sans';font-size:.78rem;cursor:pointer;min-width:180px;outline:none">
+      <select id="teamfilter" onchange="setTeamFilter(this.value)" class="team-select">
         <option value="all">Barcha jamoalar</option>
       </select>
     </div>
+    <select class="fbar-mobile" id="fbar-mobile" onchange="setFilter(this.value)"></select>
     <div class="fbar" id="fbar"></div>
     <div id="allmatches" class="mlist"></div>
   </div>
@@ -926,11 +935,15 @@ function renderMatches() {
   // Jamoa dropdown
   renderTeamDropdown();
 
-  // Guruh filtri tugmalari
+  // Guruh filtri tugmalari + mobil dropdown
   var letters = ['all'].concat(Object.keys(GROUPS));
   document.getElementById('fbar').innerHTML = letters.map(function(g) {
     return '<button class="fb' + (mFilter === g ? ' act' : '') + '" onclick="setFilter(\'' + g + '\',this)">'
       + (g === 'all' ? 'Barchasi' : 'Guruh ' + g) + '</button>';
+  }).join('');
+  document.getElementById('fbar-mobile').innerHTML = letters.map(function(g) {
+    return '<option value="' + g + '"' + (mFilter === g ? ' selected' : '') + '>'
+      + (g === 'all' ? 'Barchasi' : 'Guruh ' + g) + '</option>';
   }).join('');
 
   // Filtrlash: guruh + jamoa
