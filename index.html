@@ -1334,7 +1334,7 @@ function renderFavSection() {
       return da.localeCompare(db);
     }).slice(0, 4);
   if (!favFixtures.length) return '';
-  return '<div class="fav-sec"><div class="sec" style="font-size:1.2rem">★ Sevimlilar</div>'
+  return '<div id="fav-section" class="fav-sec"><div class="sec" style="font-size:1.2rem">★ Sevimlilar</div>'
     + '<div class="mlist">'
     + favFixtures.map(function(f) { return fixtureCard(f, true); }).join('')
     + '</div></div>';
