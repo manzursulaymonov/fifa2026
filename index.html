@@ -137,8 +137,11 @@ main { position: relative; z-index: 1; max-width: 1440px; margin: 0 auto; paddin
 .gtbl { width: 100%; border-collapse: collapse; }
 .gtbl th { font-size: .58rem; text-transform: uppercase; letter-spacing: .07em; color: var(--muted); padding: .38rem .55rem; text-align: center; border-bottom: 1px solid var(--border2); font-family: 'DM Mono'; }
 .gtbl th:first-child { text-align: left; }
-.gtbl td { padding: .48rem .55rem; font-size: .78rem; text-align: center; border-bottom: 1px solid var(--rowline); font-family: 'DM Mono'; }
-.gtbl td:first-child { text-align: left; font-family: 'DM Sans'; font-weight: 500; font-size: .8rem; }
+.gtbl td { padding: .48rem .55rem; font-size: .78rem; text-align: center; border-bottom: 1px solid var(--rowline); font-family: 'DM Mono'; white-space: nowrap; }
+/* Birinchi ustun cho'ziladigan qilib, uzun jamoa nomi ochkolar ustunini siqib chiqarmasligi uchun qisqartiriladi */
+.gtbl td:first-child { text-align: left; font-family: 'DM Sans'; font-weight: 500; font-size: .8rem; width: 100%; max-width: 0; }
+.gtbl .trow { display: flex; align-items: center; gap: .3rem; min-width: 0; }
+.gtbl .tname { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .gtbl tr:last-child td { border-bottom: none; }
 .gtbl tr:hover td { background: var(--rowhov); }
 .pb { display: inline-flex; align-items: center; justify-content: center; width: 16px; height: 16px; border-radius: 3px; font-size: .6rem; font-weight: 700; margin-right: .35rem; font-family: 'DM Mono'; flex-shrink: 0; }
@@ -504,6 +507,12 @@ function esc(s) {
     .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
+
+// Tor joylarda (jadval ustuni) uzun nomlar uchun qisqa variant
+var SHORT_NAMES = {
+  'Bosnia and Herzegovina': 'Bosnia'
+};
+function shortName(t) { return SHORT_NAMES[t] || t; }
 
 function flagImg(team, size) {
   var url = FLAGS[team];
@@ -878,11 +887,11 @@ function renderGroups() {
     var rows = st.map(function(t, i) {
       var pc = ['p1','p2','p3','p4'][Math.min(i,3)];
       return '<tr>'
-        + '<td style="display:flex;align-items:center;gap:.3rem">'
+        + '<td><div class="trow">'
         +   '<span class="pb ' + pc + '">' + (i+1) + '</span>'
         +   flagImg(t.name, 18)
-        +   '<span>' + esc(t.name) + '</span>'
-        + '</td>'
+        +   '<span class="tname" title="' + esc(t.name) + '">' + esc(shortName(t.name)) + '</span>'
+        + '</div></td>'
         + '<td>' + t.p + '</td><td>' + t.w + '</td><td>' + t.d + '</td><td>' + t.l + '</td>'
         + '<td>' + t.gf + ':' + t.ga + '</td>'
         + '<td>' + (t.gd > 0 ? '+' : '') + t.gd + '</td>'

@@ -202,6 +202,20 @@ check('drawer dialog roli bilan', /role="dialog"/.test(html) && /aria-modal="tru
 check('toast aria-live', /aria-live="polite"/.test(html));
 check('reduced-motion qo\'llab-quvvatlanadi', /prefers-reduced-motion/.test(html));
 
+console.log('\n[13] Guruh jadvali — uzun nomlar ochkolarni siqib chiqarmasligi');
+sandbox.renderGroups();
+const ggridHtml = sandbox.document.getElementById('ggrid').innerHTML;
+check('Bosniya qisqa nom bilan ko\'rsatiladi', />Bosnia</.test(ggridHtml));
+check('to\'liq nom title atributida saqlanadi', /title="Bosnia and Herzegovina"/.test(ggridHtml));
+check('nom hujayrasi tname klassi bilan (ellipsis)', /class="tname"/.test(ggridHtml));
+check('CSS: birinchi ustun cho\'ziluvchan, raqamlar nowrap', (() => {
+  const css = html.match(/<style>([\s\S]*)<\/style>/)[1];
+  return /\.gtbl td:first-child[^}]*max-width: 0/.test(css)
+    && /\.gtbl td[^:}]*{[^}]*white-space: nowrap/.test(css)
+    && /\.gtbl \.tname[^}]*text-overflow: ellipsis/.test(css);
+})());
+check('shortName boshqa nomlarni o\'zgartirmaydi', sandbox.shortName('Uzbekistan') === 'Uzbekistan');
+
 console.log('\n──────────────────────────────');
 console.log(passed + ' o\'tdi, ' + failed + ' yiqildi');
 process.exit(failed ? 1 : 0);
