@@ -83,7 +83,6 @@ main { position: relative; z-index: 1; max-width: 1440px; margin: 0 auto; paddin
 .st-done { background: rgba(39,174,96,.14); color: var(--lime2); }
 .st-live { background: rgba(231,76,60,.18); color: var(--red2); animation: blink .9s infinite; }
 .st-soon { background: rgba(240,192,64,.09); color: var(--gold2); }
-.tflag { width: 26px; height: 18px; object-fit: cover; border-radius: 2px; flex-shrink: 0; display: block; }
 
 /* GROUPS */
 .ggrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(305px,1fr)); gap: 1.1rem; }
@@ -252,87 +251,141 @@ main { position: relative; z-index: 1; max-width: 1440px; margin: 0 auto; paddin
 
 <script>
 // ═══════════════════════════════════════════════════
-// STATIC DATA — FIFA 2026 official draw (Dec 5, 2025)
+// STATIC DATA — FIFA 2026 rasmiy qura (2025-12-05, Vashington)
+// Sana/vaqtlar UTC da saqlanadi, ko'rsatishda mahalliy vaqtga o'giriladi
 // ═══════════════════════════════════════════════════
 var GROUPS = {
-  A:{teams:['Mexico','South Africa','South Korea','Iceland'],flags:{'Mexico':'🇲🇽','South Africa':'🇿🇦','South Korea':'🇰🇷','Iceland':'🇮🇸'}},
-  B:{teams:['Canada','Qatar','Switzerland','Albania'],flags:{'Canada':'🇨🇦','Qatar':'🇶🇦','Switzerland':'🇨🇭','Albania':'🇦🇱'}},
-  C:{teams:['Morocco','Haiti','Scotland','Brazil'],flags:{'Morocco':'🇲🇦','Haiti':'🇭🇹','Scotland':'🏴󠁧󠁢󠁳󠁣󠁴󠁿','Brazil':'🇧🇷'}},
-  D:{teams:['USA','Paraguay','New Zealand','Iran'],flags:{'USA':'🇺🇸','Paraguay':'🇵🇾','New Zealand':'🇳🇿','Iran':'🇮🇷'}},
-  E:{teams:['Spain','Cape Verde','Saudi Arabia','Slovakia'],flags:{'Spain':'🇪🇸','Cape Verde':'🇨🇻','Saudi Arabia':'🇸🇦','Slovakia':'🇸🇰'}},
-  F:{teams:['Germany','Chile','Japan','Belgium'],flags:{'Germany':'🇩🇪','Chile':'🇨🇱','Japan':'🇯🇵','Belgium':'🇧🇪'}},
-  G:{teams:['Netherlands','Senegal','Ecuador','Iraq'],flags:{'Netherlands':'🇳🇱','Senegal':'🇸🇳','Ecuador':'🇪🇨','Iraq':'🇮🇶'}},
-  H:{teams:['Portugal','Egypt','Costa Rica','Belarus'],flags:{'Portugal':'🇵🇹','Egypt':'🇪🇬','Costa Rica':'🇨🇷','Belarus':'🇧🇾'}},
-  I:{teams:['France','Senegal','Norway','Bahrain'],flags:{'France':'🇫🇷','Senegal':'🇸🇳','Norway':'🇳🇴','Bahrain':'🇧🇭'}},
-  J:{teams:['Argentina','Algeria','Austria','Jordan'],flags:{'Argentina':'🇦🇷','Algeria':'🇩🇿','Austria':'🇦🇹','Jordan':'🇯🇴'}},
-  K:{teams:['Portugal','Uzbekistan','Colombia','Venezuela'],flags:{'Portugal':'🇵🇹','Uzbekistan':'🇺🇿','Colombia':'🇨🇴','Venezuela':'🇻🇪'}},
-  L:{teams:['England','Croatia','Ghana','Panama'],flags:{'England':'🏴󠁧󠁢󠁥󠁮󠁧󠁿','Croatia':'🇭🇷','Ghana':'🇬🇭','Panama':'🇵🇦'}}
+  A: ['Mexico', 'South Africa', 'South Korea', 'Czechia'],
+  B: ['Canada', 'Bosnia and Herzegovina', 'Qatar', 'Switzerland'],
+  C: ['Brazil', 'Morocco', 'Haiti', 'Scotland'],
+  D: ['USA', 'Paraguay', 'Australia', 'Türkiye'],
+  E: ['Germany', 'Curaçao', 'Ivory Coast', 'Ecuador'],
+  F: ['Netherlands', 'Japan', 'Sweden', 'Tunisia'],
+  G: ['Belgium', 'Egypt', 'Iran', 'New Zealand'],
+  H: ['Spain', 'Cape Verde', 'Saudi Arabia', 'Uruguay'],
+  I: ['France', 'Senegal', 'Iraq', 'Norway'],
+  J: ['Argentina', 'Algeria', 'Austria', 'Jordan'],
+  K: ['Portugal', 'DR Congo', 'Uzbekistan', 'Colombia'],
+  L: ['England', 'Croatia', 'Ghana', 'Panama']
 };
 
-var PAIRS = [[0,1],[2,3],[0,2],[1,3],[0,3],[1,2]];
-
-var GRP_DATES = {
-  A:['2026-06-11','2026-06-11','2026-06-15','2026-06-16','2026-06-19','2026-06-20'],
-  B:['2026-06-12','2026-06-12','2026-06-16','2026-06-16','2026-06-20','2026-06-20'],
-  C:['2026-06-13','2026-06-13','2026-06-17','2026-06-17','2026-06-21','2026-06-21'],
-  D:['2026-06-13','2026-06-14','2026-06-17','2026-06-18','2026-06-21','2026-06-22'],
-  E:['2026-06-14','2026-06-15','2026-06-18','2026-06-19','2026-06-22','2026-06-23'],
-  F:['2026-06-14','2026-06-15','2026-06-19','2026-06-19','2026-06-23','2026-06-23'],
-  G:['2026-06-15','2026-06-15','2026-06-19','2026-06-20','2026-06-23','2026-06-24'],
-  H:['2026-06-16','2026-06-16','2026-06-20','2026-06-20','2026-06-24','2026-06-24'],
-  I:['2026-06-16','2026-06-17','2026-06-21','2026-06-21','2026-06-25','2026-06-25'],
-  J:['2026-06-17','2026-06-17','2026-06-21','2026-06-22','2026-06-25','2026-06-26'],
-  K:['2026-06-17','2026-06-18','2026-06-22','2026-06-22','2026-06-26','2026-06-26'],
-  L:['2026-06-18','2026-06-18','2026-06-22','2026-06-23','2026-06-26','2026-06-27']
-};
-
-var GRP_TIMES = {
-  A:['19:00','22:00','16:00','22:00','20:00','20:00'],
-  B:['19:00','22:00','16:00','22:00','20:00','20:00'],
-  C:['19:00','22:00','16:00','22:00','20:00','20:00'],
-  D:['22:00','19:00','22:00','19:00','20:00','20:00'],
-  E:['22:00','19:00','22:00','19:00','20:00','20:00'],
-  F:['19:00','22:00','19:00','22:00','20:00','20:00'],
-  G:['19:00','22:00','19:00','22:00','20:00','20:00'],
-  H:['19:00','22:00','19:00','22:00','20:00','20:00'],
-  I:['22:00','19:00','22:00','19:00','20:00','20:00'],
-  J:['19:00','22:00','19:00','22:00','20:00','20:00'],
-  K:['22:00','19:00','22:00','19:00','20:00','20:00'],
-  L:['19:00','22:00','19:00','22:00','20:00','20:00']
-};
-
-var GRP_VENUES = {
-  A:["AT&T Stadium, Dallas","FNB Stadium, Jo'burg","SoFi Stadium, LA","Rose Bowl, LA"],
-  B:['BMO Field, Toronto','Lusail Stadium, Qatar','MetLife Stadium, NY','Hard Rock Stadium, Miami'],
-  C:["Levi's Stadium, SF",'Bank of America, Charlotte','Empower Field, Denver','Estadio Azteca, Mexico City'],
-  D:['MetLife Stadium, NY','Estadio Nacional, Asuncion','Eden Park, Auckland','Rose Bowl, LA'],
-  E:['SoFi Stadium, LA','Estadio Azteca, Mexico City','Gillette Stadium, Boston','Hard Rock Stadium, Miami'],
-  F:['AT&T Stadium, Dallas','Estadio Monumental, Santiago','Toyota Stadium, Dallas','King Baudouin, Brussels'],
-  G:["Levi's Stadium, SF",'Stade L.S. Senghor, Dakar','Estadio Monumental, Buenos Aires','AT&T Stadium, Dallas'],
-  H:['Estadio da Luz, Lisbon','Cairo International','Estadio Nacional, San Jose','Dinamo, Minsk'],
-  I:['Parc des Princes, Paris','Stade L.S. Senghor, Dakar','Ullevaal Stadion, Oslo','National Stadium, Bahrain'],
-  J:['El Monumental, Buenos Aires','Stade M. Tchaker, Blida','Ernst Happel, Vienna','International Stadium, Amman'],
-  K:['Estadio da Luz, Lisbon','Milliy Stadion, Toshkent','El Campin, Bogota','Estadio Monumental, Caracas'],
-  L:['Wembley, London','Stadion Maksimir, Zagreb','Accra Sports Stadium','Estadio Rommel Fernandez, Panama']
+// Har bir o'yin: [uy idx, mehmon idx, UTC kick-off, stadion]
+var SCHEDULE = {
+  A: [
+    [0,1,'2026-06-11T19:00:00Z','Estadio Azteca, Mexico City'],
+    [2,3,'2026-06-12T02:00:00Z','Estadio Akron, Guadalajara'],
+    [3,1,'2026-06-18T16:00:00Z','Mercedes-Benz Stadium, Atlanta'],
+    [0,2,'2026-06-19T01:00:00Z','Estadio Akron, Guadalajara'],
+    [3,0,'2026-06-25T01:00:00Z','Estadio Azteca, Mexico City'],
+    [1,2,'2026-06-25T01:00:00Z','Estadio BBVA, Monterrey']
+  ],
+  B: [
+    [0,1,'2026-06-12T19:00:00Z','BMO Field, Toronto'],
+    [2,3,'2026-06-13T19:00:00Z',"Levi's Stadium, San Francisco Bay"],
+    [3,1,'2026-06-18T19:00:00Z','SoFi Stadium, Los Angeles'],
+    [0,2,'2026-06-18T22:00:00Z','BC Place, Vancouver'],
+    [3,0,'2026-06-24T19:00:00Z','BC Place, Vancouver'],
+    [1,2,'2026-06-24T19:00:00Z','Lumen Field, Seattle']
+  ],
+  C: [
+    [0,1,'2026-06-13T22:00:00Z','MetLife Stadium, New York/NJ'],
+    [2,3,'2026-06-14T01:00:00Z','Gillette Stadium, Boston'],
+    [3,1,'2026-06-19T22:00:00Z','Gillette Stadium, Boston'],
+    [0,2,'2026-06-20T01:00:00Z','Lincoln Financial Field, Philadelphia'],
+    [3,0,'2026-06-24T22:00:00Z','Hard Rock Stadium, Miami'],
+    [1,2,'2026-06-24T22:00:00Z','Mercedes-Benz Stadium, Atlanta']
+  ],
+  D: [
+    [0,1,'2026-06-13T01:00:00Z','SoFi Stadium, Los Angeles'],
+    [2,3,'2026-06-13T04:00:00Z','BC Place, Vancouver'],
+    [0,2,'2026-06-19T19:00:00Z','Lumen Field, Seattle'],
+    [3,1,'2026-06-20T03:00:00Z',"Levi's Stadium, San Francisco Bay"],
+    [3,0,'2026-06-26T02:00:00Z','SoFi Stadium, Los Angeles'],
+    [1,2,'2026-06-26T02:00:00Z',"Levi's Stadium, San Francisco Bay"]
+  ],
+  E: [
+    [0,1,'2026-06-14T17:00:00Z','NRG Stadium, Houston'],
+    [2,3,'2026-06-14T23:00:00Z','Lincoln Financial Field, Philadelphia'],
+    [0,2,'2026-06-20T20:00:00Z','BMO Field, Toronto'],
+    [3,1,'2026-06-21T00:00:00Z','Arrowhead Stadium, Kansas City'],
+    [1,2,'2026-06-25T20:00:00Z','Lincoln Financial Field, Philadelphia'],
+    [3,0,'2026-06-25T20:00:00Z','MetLife Stadium, New York/NJ']
+  ],
+  F: [
+    [0,1,'2026-06-14T20:00:00Z','AT&T Stadium, Dallas'],
+    [2,3,'2026-06-15T02:00:00Z','Estadio Akron, Guadalajara'],
+    [0,2,'2026-06-20T17:00:00Z','NRG Stadium, Houston'],
+    [3,1,'2026-06-21T04:00:00Z','Estadio Akron, Guadalajara'],
+    [1,2,'2026-06-25T23:00:00Z','AT&T Stadium, Dallas'],
+    [3,0,'2026-06-25T23:00:00Z','Arrowhead Stadium, Kansas City']
+  ],
+  G: [
+    [0,1,'2026-06-15T19:00:00Z','Lumen Field, Seattle'],
+    [2,3,'2026-06-16T01:00:00Z','SoFi Stadium, Los Angeles'],
+    [0,2,'2026-06-21T19:00:00Z','SoFi Stadium, Los Angeles'],
+    [3,1,'2026-06-22T01:00:00Z','BC Place, Vancouver'],
+    [1,2,'2026-06-27T03:00:00Z','Lumen Field, Seattle'],
+    [3,0,'2026-06-27T03:00:00Z','BC Place, Vancouver']
+  ],
+  H: [
+    [0,1,'2026-06-15T16:00:00Z','Mercedes-Benz Stadium, Atlanta'],
+    [2,3,'2026-06-15T22:00:00Z','Hard Rock Stadium, Miami'],
+    [0,2,'2026-06-21T16:00:00Z','Mercedes-Benz Stadium, Atlanta'],
+    [3,1,'2026-06-21T22:00:00Z','Hard Rock Stadium, Miami'],
+    [1,2,'2026-06-27T00:00:00Z','NRG Stadium, Houston'],
+    [3,0,'2026-06-27T00:00:00Z','Estadio Akron, Guadalajara']
+  ],
+  I: [
+    [0,1,'2026-06-16T19:00:00Z','MetLife Stadium, New York/NJ'],
+    [2,3,'2026-06-16T22:00:00Z','Gillette Stadium, Boston'],
+    [0,2,'2026-06-22T21:00:00Z','Lincoln Financial Field, Philadelphia'],
+    [3,1,'2026-06-23T00:00:00Z','MetLife Stadium, New York/NJ'],
+    [3,0,'2026-06-26T19:00:00Z','Gillette Stadium, Boston'],
+    [1,2,'2026-06-26T19:00:00Z','BMO Field, Toronto']
+  ],
+  J: [
+    [0,1,'2026-06-17T01:00:00Z','Arrowhead Stadium, Kansas City'],
+    [2,3,'2026-06-17T04:00:00Z',"Levi's Stadium, San Francisco Bay"],
+    [0,2,'2026-06-22T17:00:00Z','AT&T Stadium, Dallas'],
+    [3,1,'2026-06-23T03:00:00Z',"Levi's Stadium, San Francisco Bay"],
+    [1,2,'2026-06-28T02:00:00Z','Arrowhead Stadium, Kansas City'],
+    [3,0,'2026-06-28T02:00:00Z','AT&T Stadium, Dallas']
+  ],
+  K: [
+    [0,1,'2026-06-17T17:00:00Z','NRG Stadium, Houston'],
+    [2,3,'2026-06-18T02:00:00Z','Estadio Azteca, Mexico City'],
+    [0,2,'2026-06-23T17:00:00Z','NRG Stadium, Houston'],
+    [3,1,'2026-06-24T02:00:00Z','Estadio Akron, Guadalajara'],
+    [3,0,'2026-06-27T23:30:00Z','Hard Rock Stadium, Miami'],
+    [1,2,'2026-06-27T23:30:00Z','Mercedes-Benz Stadium, Atlanta']
+  ],
+  L: [
+    [0,1,'2026-06-17T20:00:00Z','AT&T Stadium, Dallas'],
+    [2,3,'2026-06-17T23:00:00Z','BMO Field, Toronto'],
+    [0,2,'2026-06-23T20:00:00Z','Gillette Stadium, Boston'],
+    [3,1,'2026-06-23T23:00:00Z','BMO Field, Toronto'],
+    [3,0,'2026-06-27T21:00:00Z','MetLife Stadium, New York/NJ'],
+    [1,2,'2026-06-27T21:00:00Z','Lincoln Financial Field, Philadelphia']
+  ]
 };
 
 // Build fixtures array
 var FIXTURES = [];
 var _fid = 1;
 Object.keys(GROUPS).forEach(function(g) {
-  PAIRS.forEach(function(p, i) {
+  SCHEDULE[g].forEach(function(m) {
     FIXTURES.push({
       id: String(_fid++),
       group: g,
-      home: GROUPS[g].teams[p[0]],
-      away: GROUPS[g].teams[p[1]],
-      date: GRP_DATES[g][i],
-      time: GRP_TIMES[g][i],
-      venue: GRP_VENUES[g][i] || '',
+      home: GROUPS[g][m[0]],
+      away: GROUPS[g][m[1]],
+      utc: m[2],
+      venue: m[3],
       homeScore: null,
       awayScore: null,
       status: 'NS',
       apiId: null,
+      apiSwapped: false,
       homeScorers: [],
       awayScorers: [],
       stats: null
@@ -341,55 +394,63 @@ Object.keys(GROUPS).forEach(function(g) {
 });
 
 // Bayroqlar — Twemoji SVG (har joyda ishlaydi)
-// Twemoji kerak bo'lsa cdnjs dan yuklanadi, aks holda emoji ko'rsatiladi
+var TW = 'https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/svg/';
 var FLAGS = {
-  'Mexico': 'https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/svg/1f1f2-1f1fd.svg',
-  'South Africa': 'https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/svg/1f1ff-1f1e6.svg',
-  'South Korea': 'https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/svg/1f1f0-1f1f7.svg',
-  'Iceland': 'https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/svg/1f1ee-1f1f8.svg',
-  'Canada': 'https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/svg/1f1e8-1f1e6.svg',
-  'Qatar': 'https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/svg/1f1f6-1f1e6.svg',
-  'Switzerland': 'https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/svg/1f1e8-1f1ed.svg',
-  'Albania': 'https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/svg/1f1e6-1f1f1.svg',
-  'Morocco': 'https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/svg/1f1f2-1f1e6.svg',
-  'Haiti': 'https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/svg/1f1ed-1f1f9.svg',
-  'Scotland': 'https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/svg/1f3f4.svg',
-  'Brazil': 'https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/svg/1f1e7-1f1f7.svg',
-  'USA': 'https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/svg/1f1fa-1f1f8.svg',
-  'Paraguay': 'https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/svg/1f1f5-1f1fe.svg',
-  'New Zealand': 'https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/svg/1f1f3-1f1ff.svg',
-  'Iran': 'https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/svg/1f1ee-1f1f7.svg',
-  'Spain': 'https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/svg/1f1ea-1f1f8.svg',
-  'Cape Verde': 'https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/svg/1f1e8-1f1fb.svg',
-  'Saudi Arabia': 'https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/svg/1f1f8-1f1e6.svg',
-  'Slovakia': 'https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/svg/1f1f8-1f1f0.svg',
-  'Germany': 'https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/svg/1f1e9-1f1ea.svg',
-  'Chile': 'https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/svg/1f1e8-1f1f1.svg',
-  'Japan': 'https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/svg/1f1ef-1f1f5.svg',
-  'Belgium': 'https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/svg/1f1e7-1f1ea.svg',
-  'Netherlands': 'https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/svg/1f1f3-1f1f1.svg',
-  'Senegal': 'https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/svg/1f1f8-1f1f3.svg',
-  'Ecuador': 'https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/svg/1f1ea-1f1e8.svg',
-  'Iraq': 'https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/svg/1f1ee-1f1f6.svg',
-  'Portugal': 'https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/svg/1f1f5-1f1f9.svg',
-  'Egypt': 'https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/svg/1f1ea-1f1ec.svg',
-  'Costa Rica': 'https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/svg/1f1e8-1f1f7.svg',
-  'Belarus': 'https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/svg/1f1e7-1f1fe.svg',
-  'France': 'https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/svg/1f1eb-1f1f7.svg',
-  'Norway': 'https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/svg/1f1f3-1f1f4.svg',
-  'Bahrain': 'https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/svg/1f1e7-1f1ed.svg',
-  'Argentina': 'https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/svg/1f1e6-1f1f7.svg',
-  'Algeria': 'https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/svg/1f1e9-1f1ff.svg',
-  'Austria': 'https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/svg/1f1e6-1f1f9.svg',
-  'Jordan': 'https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/svg/1f1ef-1f1f4.svg',
-  'Uzbekistan': 'https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/svg/1f1fa-1f1ff.svg',
-  'Colombia': 'https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/svg/1f1e8-1f1f4.svg',
-  'Venezuela': 'https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/svg/1f1fb-1f1ea.svg',
-  'England': 'https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/svg/1f3f4.svg',
-  'Croatia': 'https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/svg/1f1ed-1f1f7.svg',
-  'Ghana': 'https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/svg/1f1ec-1f1ed.svg',
-  'Panama': 'https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/svg/1f1f5-1f1e6.svg',
+  'Mexico': TW + '1f1f2-1f1fd.svg',
+  'South Africa': TW + '1f1ff-1f1e6.svg',
+  'South Korea': TW + '1f1f0-1f1f7.svg',
+  'Czechia': TW + '1f1e8-1f1ff.svg',
+  'Canada': TW + '1f1e8-1f1e6.svg',
+  'Bosnia and Herzegovina': TW + '1f1e7-1f1e6.svg',
+  'Qatar': TW + '1f1f6-1f1e6.svg',
+  'Switzerland': TW + '1f1e8-1f1ed.svg',
+  'Brazil': TW + '1f1e7-1f1f7.svg',
+  'Morocco': TW + '1f1f2-1f1e6.svg',
+  'Haiti': TW + '1f1ed-1f1f9.svg',
+  'Scotland': TW + '1f3f4-e0067-e0062-e0073-e0063-e0074-e007f.svg',
+  'USA': TW + '1f1fa-1f1f8.svg',
+  'Paraguay': TW + '1f1f5-1f1fe.svg',
+  'Australia': TW + '1f1e6-1f1fa.svg',
+  'Türkiye': TW + '1f1f9-1f1f7.svg',
+  'Germany': TW + '1f1e9-1f1ea.svg',
+  'Curaçao': TW + '1f1e8-1f1fc.svg',
+  'Ivory Coast': TW + '1f1e8-1f1ee.svg',
+  'Ecuador': TW + '1f1ea-1f1e8.svg',
+  'Netherlands': TW + '1f1f3-1f1f1.svg',
+  'Japan': TW + '1f1ef-1f1f5.svg',
+  'Sweden': TW + '1f1f8-1f1ea.svg',
+  'Tunisia': TW + '1f1f9-1f1f3.svg',
+  'Belgium': TW + '1f1e7-1f1ea.svg',
+  'Egypt': TW + '1f1ea-1f1ec.svg',
+  'Iran': TW + '1f1ee-1f1f7.svg',
+  'New Zealand': TW + '1f1f3-1f1ff.svg',
+  'Spain': TW + '1f1ea-1f1f8.svg',
+  'Cape Verde': TW + '1f1e8-1f1fb.svg',
+  'Saudi Arabia': TW + '1f1f8-1f1e6.svg',
+  'Uruguay': TW + '1f1fa-1f1fe.svg',
+  'France': TW + '1f1eb-1f1f7.svg',
+  'Senegal': TW + '1f1f8-1f1f3.svg',
+  'Iraq': TW + '1f1ee-1f1f6.svg',
+  'Norway': TW + '1f1f3-1f1f4.svg',
+  'Argentina': TW + '1f1e6-1f1f7.svg',
+  'Algeria': TW + '1f1e9-1f1ff.svg',
+  'Austria': TW + '1f1e6-1f1f9.svg',
+  'Jordan': TW + '1f1ef-1f1f4.svg',
+  'Portugal': TW + '1f1f5-1f1f9.svg',
+  'DR Congo': TW + '1f1e8-1f1e9.svg',
+  'Uzbekistan': TW + '1f1fa-1f1ff.svg',
+  'Colombia': TW + '1f1e8-1f1f4.svg',
+  'England': TW + '1f3f4-e0067-e0062-e0065-e006e-e0067-e007f.svg',
+  'Croatia': TW + '1f1ed-1f1f7.svg',
+  'Ghana': TW + '1f1ec-1f1ed.svg',
+  'Panama': TW + '1f1f5-1f1e6.svg'
 };
+
+function esc(s) {
+  return String(s == null ? '' : s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
 
 function flagImg(team, size) {
   var url = FLAGS[team];
@@ -398,37 +459,38 @@ function flagImg(team, size) {
   var h = Math.round(w * 0.75);
   return '<img src="' + url + '" width="' + w + '" height="' + h + '"'
     + ' style="object-fit:contain;flex-shrink:0;vertical-align:middle;border-radius:2px"'
-    + ' alt="' + team + '">'; 
+    + ' alt="' + esc(team) + '">';
 }
 
-// DATE / TIME HELPERS
+// ═══════════════════════════════════════════════════
+// DATE / TIME HELPERS (mahalliy vaqtda ko'rsatiladi)
 // ═══════════════════════════════════════════════════
 var DAYS = ['Yak', 'Dush', 'Sesh', 'Chor', 'Pay', 'Jum', 'Shan'];
 
-function fmtDateFull(dateStr) {
-  if (!dateStr) return '';
-  var parts = dateStr.split('-');
-  var y = parts[0], m = parts[1], d = parts[2];
-  var dt = new Date(parseInt(y), parseInt(m) - 1, parseInt(d));
-  return d + '.' + m + '.' + y + ' — ' + DAYS[dt.getDay()];
+function pad2(n) { return (n < 10 ? '0' : '') + n; }
+
+function fxLocal(f) { return new Date(f.utc); }
+
+function fxDateKey(f) {
+  var d = fxLocal(f);
+  return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate());
 }
 
-function fmtDate(dateStr) {
-  if (!dateStr) return '';
-  var parts = dateStr.split('-');
-  return parts[2] + '.' + parts[1] + '.' + parts[0];
+function fxDate(f) {
+  var d = fxLocal(f);
+  return pad2(d.getDate()) + '.' + pad2(d.getMonth() + 1) + '.' + d.getFullYear();
 }
 
-function fmtTime(timeUtc) {
-  if (!timeUtc) return '';
-  var parts = timeUtc.split(':');
-  var hh = parseInt(parts[0]);
-  var mm = parseInt(parts[1]);
-  var now = new Date();
-  var d = new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate(), hh, mm, 0));
-  var lh = d.getHours();
-  var lm = d.getMinutes();
-  return (lh < 10 ? '0' : '') + lh + ':' + (lm < 10 ? '0' : '') + lm;
+function fxTime(f) {
+  var d = fxLocal(f);
+  return pad2(d.getHours()) + ':' + pad2(d.getMinutes());
+}
+
+function fmtDateFull(dateKey) {
+  if (!dateKey) return '';
+  var parts = dateKey.split('-');
+  var dt = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
+  return parts[2] + '.' + parts[1] + '.' + parts[0] + ' — ' + DAYS[dt.getDay()];
 }
 
 // ═══════════════════════════════════════════════════
@@ -447,29 +509,92 @@ function setApi(state, txt) {
 }
 
 // ═══════════════════════════════════════════════════
+// TEAM NAME MATCHING (API nomlari farq qilishi mumkin)
+// ═══════════════════════════════════════════════════
+var TEAM_ALIASES = {
+  'united states': 'usa',
+  'united states of america': 'usa',
+  'korea republic': 'south korea',
+  'czech republic': 'czechia',
+  'turkey': 'turkiye',
+  'cote d ivoire': 'ivory coast',
+  'congo dr': 'dr congo',
+  'democratic republic of congo': 'dr congo',
+  'democratic republic of the congo': 'dr congo',
+  'congo kinshasa': 'dr congo',
+  'bosnia herzegovina': 'bosnia and herzegovina',
+  'bosnia': 'bosnia and herzegovina',
+  'cabo verde': 'cape verde',
+  'cape verde islands': 'cape verde',
+  'holland': 'netherlands',
+  'ir iran': 'iran',
+  'iran islamic republic of': 'iran'
+};
+
+function normTeam(s) {
+  var t = String(s || '').toLowerCase();
+  try { t = t.normalize('NFD').replace(/[̀-ͯ]/g, ''); } catch (e) {}
+  t = t.replace(/[^a-z ]/g, ' ').replace(/\s+/g, ' ').trim();
+  return TEAM_ALIASES[t] || t;
+}
+
+// Aniqlik uchun faqat to'liq mos kelishni qabul qilamiz
+// (oldingi qisman moslash South Africa / South Korea ni adashtirardi)
+function matchFixture(ev) {
+  var h = normTeam(ev.strHomeTeam);
+  var a = normTeam(ev.strAwayTeam);
+  if (!h || !a) return null;
+  var fix = FIXTURES.find(function(f) {
+    return normTeam(f.home) === h && normTeam(f.away) === a;
+  });
+  if (fix) return { fix: fix, swapped: false };
+  fix = FIXTURES.find(function(f) {
+    return normTeam(f.home) === a && normTeam(f.away) === h;
+  });
+  if (fix) return { fix: fix, swapped: true };
+  return null;
+}
+
+// ═══════════════════════════════════════════════════
 // API LOADING
 // ═══════════════════════════════════════════════════
+function applyEvents(events) {
+  var matched = 0;
+  events.forEach(function(ev) {
+    var m = matchFixture(ev);
+    if (!m) return;
+    var fix = m.fix;
+    fix.apiId = ev.idEvent;
+    fix.apiSwapped = m.swapped;
+    if (ev.strVenue) fix.venue = ev.strVenue;
+    var hs = parseInt(m.swapped ? ev.intAwayScore : ev.intHomeScore, 10);
+    var as = parseInt(m.swapped ? ev.intHomeScore : ev.intAwayScore, 10);
+    if (!isNaN(hs) && !isNaN(as)) {
+      fix.homeScore = hs;
+      fix.awayScore = as;
+      fix.status = ev.strStatus || 'FT';
+      matched++;
+    } else {
+      fix.status = ev.strStatus || 'NS';
+    }
+  });
+  return matched;
+}
+
 function loadAll() {
   setApi('spin', 'API...');
-  fetch(API_BASE + '/eventsseason.php?id=' + LEAGUE_ID + '&s=2025-2026')
+  // TheSportsDB da JCh mavsumi "2026"; eski "2025-2026" zaxira sifatida
+  fetch(API_BASE + '/eventsseason.php?id=' + LEAGUE_ID + '&s=2026')
     .then(function(r) { return r.json(); })
     .then(function(data) {
       var events = data.events || [];
-      var matched = 0;
-      events.forEach(function(ev) {
-        var fix = matchFixture(ev);
-        if (!fix) return;
-        fix.apiId = ev.idEvent;
-        if (ev.strVenue) fix.venue = ev.strVenue;
-        if (ev.intHomeScore !== null && ev.intHomeScore !== '' && ev.intHomeScore !== undefined) {
-          fix.homeScore = parseInt(ev.intHomeScore);
-          fix.awayScore = parseInt(ev.intAwayScore);
-          fix.status = ev.strStatus || 'FT';
-          matched++;
-        } else {
-          fix.status = ev.strStatus || 'NS';
-        }
-      });
+      if (events.length) return events;
+      return fetch(API_BASE + '/eventsseason.php?id=' + LEAGUE_ID + '&s=2025-2026')
+        .then(function(r) { return r.json(); })
+        .then(function(d2) { return d2.events || []; });
+    })
+    .then(function(events) {
+      var matched = applyEvents(events);
       setApi('ok', events.length + " o'yin · " + matched + ' natija');
       renderAll();
       if (curPage === 'groups') renderGroups();
@@ -480,18 +605,6 @@ function loadAll() {
       setApi('err', 'API xatosi');
       showToast("API ga ulanib bo'lmadi", true);
     });
-}
-
-function matchFixture(ev) {
-  var h = (ev.strHomeTeam || '').toLowerCase();
-  var a = (ev.strAwayTeam || '').toLowerCase();
-  return FIXTURES.find(function(f) {
-    var fh = f.home.toLowerCase();
-    var fa = f.away.toLowerCase();
-    var hMatch = fh.indexOf(h.split(' ')[0]) >= 0 || h.indexOf(fh.split(' ')[0]) >= 0;
-    var aMatch = fa.indexOf(a.split(' ')[0]) >= 0 || a.indexOf(fa.split(' ')[0]) >= 0;
-    return hMatch && aMatch;
-  });
 }
 
 function loadAllScorers() {
@@ -513,18 +626,18 @@ function loadAllScorers() {
   next();
 }
 
+// Gol uruvchilar: lookuptimeline.php (eventresults.php futbol gollarini bermaydi)
 function loadEventScorers(fix) {
-  return fetch(API_BASE + '/eventresults.php?id=' + fix.apiId)
+  return fetch(API_BASE + '/lookuptimeline.php?id=' + fix.apiId)
     .then(function(r) { return r.json(); })
     .then(function(data) {
       fix.homeScorers = [];
       fix.awayScorers = [];
-      (data.results || []).forEach(function(r) {
-        if (!r.strPlayer) return;
-        var entry = { name: r.strPlayer, time: r.intResult || '', type: r.strResultType || 'Goal' };
-        var teamLow = (r.strTeam || '').toLowerCase();
-        var homeLow = fix.home.toLowerCase().split(' ')[0];
-        if (teamLow.indexOf(homeLow) >= 0) fix.homeScorers.push(entry);
+      (data.timeline || []).forEach(function(t) {
+        if (t.strTimeline !== 'Goal' || !t.strPlayer) return;
+        var entry = { name: t.strPlayer, time: t.intTime || '', type: t.strTimelineDetail || 'Goal' };
+        var isHome = (t.strHome === 'Yes') !== fix.apiSwapped;
+        if (isHome) fix.homeScorers.push(entry);
         else fix.awayScorers.push(entry);
       });
     })
@@ -534,18 +647,30 @@ function loadEventScorers(fix) {
 function loadEventStats(fix) {
   return fetch(API_BASE + '/lookupeventstats.php?id=' + fix.apiId)
     .then(function(r) { return r.json(); })
-    .then(function(data) { fix.stats = data.eventstats || null; })
+    .then(function(data) {
+      var stats = data.eventstats || null;
+      if (stats && fix.apiSwapped) {
+        stats = stats.map(function(s) {
+          return { strStat: s.strStat, intHome: s.intAway, intAway: s.intHome };
+        });
+      }
+      fix.stats = stats;
+    })
     .catch(function() {});
+}
+
+function isOwnGoal(type) {
+  return String(type || '').toLowerCase().indexOf('own') >= 0;
 }
 
 function buildScorerTotals() {
   allScorers = {};
   FIXTURES.forEach(function(f) {
     if (f.homeScore === null) return;
-    var goals = f.homeScorers.map(function(s) { return {name:s.name,team:f.home,type:s.type,time:s.time}; })
-      .concat(f.awayScorers.map(function(s) { return {name:s.name,team:f.away,type:s.type,time:s.time}; }));
+    var goals = f.homeScorers.map(function(s) { return {name:s.name,team:f.home,type:s.type}; })
+      .concat(f.awayScorers.map(function(s) { return {name:s.name,team:f.away,type:s.type}; }));
     goals.forEach(function(g) {
-      if (!g.name || g.type === 'OG') return;
+      if (!g.name || isOwnGoal(g.type)) return;
       if (!allScorers[g.name]) allScorers[g.name] = { name: g.name, team: g.team, goals: 0 };
       allScorers[g.name].goals++;
     });
@@ -555,16 +680,19 @@ function buildScorerTotals() {
 // ═══════════════════════════════════════════════════
 // HELPERS
 // ═══════════════════════════════════════════════════
+var LIVE_STATUSES = ['1H','2H','HT','ET','P','LIVE','1ST HALF','2ND HALF','HALFTIME','HALF TIME','EXTRA TIME','PENALTIES','PENALTY SHOOTOUT','IN PROGRESS'];
+var DONE_STATUSES = ['FT','AET','PEN','FINISHED','MATCH FINISHED','FULL TIME','AFTER EXTRA TIME','AFTER PENALTIES'];
+
 function statusLabel(f) {
-  var s = f.status;
-  if (s === '1H' || s === '2H' || s === 'HT' || s === 'ET' || s === 'P') return ['st-live', 'JONLI'];
-  if (s === 'FT' || s === 'AET' || s === 'PEN') return ['st-done', 'Tugadi'];
+  var s = String(f.status || '').toUpperCase().trim();
+  if (LIVE_STATUSES.indexOf(s) >= 0) return ['st-live', 'JONLI'];
+  if (DONE_STATUSES.indexOf(s) >= 0 || f.homeScore !== null) return ['st-done', 'Tugadi'];
   return ['st-soon', 'Kutilmoqda'];
 }
 
 function standings(group) {
   var t = {};
-  GROUPS[group].teams.forEach(function(n) { t[n] = {name:n,p:0,w:0,d:0,l:0,gf:0,ga:0,pts:0}; });
+  GROUPS[group].forEach(function(n) { t[n] = {name:n,p:0,w:0,d:0,l:0,gf:0,ga:0,pts:0}; });
   FIXTURES.filter(function(f) { return f.group === group && f.homeScore !== null; }).forEach(function(f) {
     var h = t[f.home], a = t[f.away];
     if (!h || !a) return;
@@ -591,10 +719,10 @@ function renderStats() {
   var topArr = Object.values(allScorers).sort(function(a,b) { return b.goals - a.goals; });
   var top = topArr[0];
   document.getElementById('statbar').innerHTML =
-    '<div class="sc"><div class="sl">O\'ynalar</div><div class="sv">' + played + '</div><div class="ss">/ 104 ta jami</div></div>' +
+    '<div class="sc"><div class="sl">O\'ynaldi</div><div class="sv">' + played + '</div><div class="ss">/ 72 guruh o\'yini</div></div>' +
     '<div class="sc"><div class="sl">Jami Gollar</div><div class="sv">' + goals + '</div><div class="ss">' + (played ? (goals/played).toFixed(1) : '—') + ' / o\'yin</div></div>' +
     '<div class="sc"><div class="sl">Guruhlar</div><div class="sv">12</div><div class="ss">48 jamoa · 3 davlat</div></div>' +
-    '<div class="sc"><div class="sl">Top Gol</div><div class="sv">' + (top ? top.goals : '—') + '</div><div class="ss">' + (top ? top.name : "Hali yo'q") + '</div></div>';
+    '<div class="sc"><div class="sl">Top Gol</div><div class="sv">' + (top ? top.goals : '—') + '</div><div class="ss">' + (top ? esc(top.name) : "Hali yo'q") + '</div></div>';
 }
 
 function fixtureCard(f, showGroup) {
@@ -604,23 +732,23 @@ function fixtureCard(f, showGroup) {
   var venue = f.venue ? f.venue.split('(')[0].trim() : '';
   return '<div class="fcard" onclick="openDrawer(\'' + f.id + '\')">'
     + '<div class="fmeta">'
-    +   '<div class="fdate">' + fmtDate(f.date) + '</div>'
-    +   '<div class="ftime">' + fmtTime(f.time) + '</div>'
-    +   '<div class="fvenue">' + venue + '</div>'
+    +   '<div class="fdate">' + fxDate(f) + '</div>'
+    +   '<div class="ftime">' + fxTime(f) + '</div>'
+    +   '<div class="fvenue">' + esc(venue) + '</div>'
     + '</div>'
     + '<div class="fhome">'
-    +   '<span>' + f.home + '</span>'
+    +   '<span>' + esc(f.home) + '</span>'
     +   flagImg(f.home, 26)
     + '</div>'
     + '<div class="fscore' + (done ? '' : ' pend') + '">'
     +   (done
           ? f.homeScore + ' &mdash; ' + f.awayScore
-          : '<span class="pend-date">' + fmtDate(f.date) + '</span><span class="pend-time">' + fmtTime(f.time) + '</span>'
+          : '<span class="pend-date">' + fxDate(f) + '</span><span class="pend-time">' + fxTime(f) + '</span>'
         )
     + '</div>'
     + '<div class="faway">'
     +   flagImg(f.away, 26)
-    +   '<span>' + f.away + '</span>'
+    +   '<span>' + esc(f.away) + '</span>'
     + '</div>'
     + '<div class="fright">'
     +   (showGroup ? '<span class="grpbadge">Guruh ' + f.group + '</span>' : '')
@@ -632,7 +760,7 @@ function fixtureCard(f, showGroup) {
 function renderOverviewLists() {
   var upcoming = FIXTURES
     .filter(function(f) { return f.homeScore === null; })
-    .sort(function(a,b) { return a.date.localeCompare(b.date) || a.time.localeCompare(b.time); })
+    .sort(function(a,b) { return a.utc.localeCompare(b.utc); })
     .slice(0, 6);
   document.getElementById('upcoming-list').innerHTML = upcoming.length
     ? upcoming.map(function(f) { return fixtureCard(f, true); }).join('')
@@ -640,7 +768,7 @@ function renderOverviewLists() {
 
   var recent = FIXTURES
     .filter(function(f) { return f.homeScore !== null; })
-    .sort(function(a,b) { return b.date.localeCompare(a.date); })
+    .sort(function(a,b) { return b.utc.localeCompare(a.utc); })
     .slice(0, 6);
   document.getElementById('recent-list').innerHTML = recent.length
     ? recent.map(function(f) { return fixtureCard(f, true); }).join('')
@@ -657,7 +785,7 @@ function renderGroups() {
         + '<td style="display:flex;align-items:center;gap:.3rem">'
         +   '<span class="pb ' + pc + '">' + (i+1) + '</span>'
         +   flagImg(t.name, 18)
-        +   '<span>' + t.name + '</span>'
+        +   '<span>' + esc(t.name) + '</span>'
         + '</td>'
         + '<td>' + t.p + '</td><td>' + t.w + '</td><td>' + t.d + '</td><td>' + t.l + '</td>'
         + '<td>' + t.gf + ':' + t.ga + '</td>'
@@ -681,7 +809,7 @@ function renderMatches() {
   }).join('');
 
   var list = mFilter === 'all' ? FIXTURES : FIXTURES.filter(function(f) { return f.group === mFilter; });
-  list = list.slice().sort(function(a,b) { return a.date.localeCompare(b.date) || a.time.localeCompare(b.time); });
+  list = list.slice().sort(function(a,b) { return a.utc.localeCompare(b.utc); });
 
   if (!list.length) {
     document.getElementById('allmatches').innerHTML = '<div class="empty"><div class="eic">📅</div>O\'yinlar topilmadi</div>';
@@ -690,8 +818,9 @@ function renderMatches() {
 
   var byDate = {};
   list.forEach(function(f) {
-    if (!byDate[f.date]) byDate[f.date] = [];
-    byDate[f.date].push(f);
+    var k = fxDateKey(f);
+    if (!byDate[k]) byDate[k] = [];
+    byDate[k].push(f);
   });
 
   var html = '';
@@ -714,7 +843,7 @@ function renderScorers() {
     return '<div class="scorerrow">'
       + '<div class="srank ' + rankClass + '">' + (i+1) + '</div>'
       + flagImg(s.team, 26)
-      + '<div class="sinfo"><div class="sname">' + s.name + '</div><div class="steam">' + s.team + '</div></div>'
+      + '<div class="sinfo"><div class="sname">' + esc(s.name) + '</div><div class="steam">' + esc(s.team) + '</div></div>'
       + '<div class="sgoals">' + s.goals + '<span>gol</span></div>'
       + '</div>';
   }).join('');
@@ -727,7 +856,7 @@ function openDrawer(fixId) {
   var f = FIXTURES.find(function(x) { return x.id === fixId; });
   if (!f) return;
   openDrawerId = fixId;
-  document.getElementById('drawer-title').textContent = 'Guruh ' + f.group + ' · ' + fmtDate(f.date);
+  document.getElementById('drawer-title').textContent = 'Guruh ' + f.group + ' · ' + fxDate(f);
   document.getElementById('drawer-overlay').classList.add('open');
   renderDrawerContent(f, false);
 
@@ -746,17 +875,17 @@ function renderDrawerContent(f, withStats) {
   if (done) {
     var allGoals = f.homeScorers.map(function(s) { return {name:s.name,team:f.home,time:s.time,type:s.type}; })
       .concat(f.awayScorers.map(function(s) { return {name:s.name,team:f.away,time:s.time,type:s.type}; }))
-      .sort(function(a,b) { return parseInt(a.time||0) - parseInt(b.time||0); });
+      .sort(function(a,b) { return (parseInt(a.time,10)||0) - (parseInt(b.time,10)||0); });
 
     scorersHtml = '<div class="dsec">⚽ Gol Uruvchilar</div>';
     if (allGoals.length) {
       scorersHtml += allGoals.map(function(g) {
         return '<div class="goal-row">'
-          + '<span class="goal-min">' + (g.time ? g.time + "'" : '—') + '</span>'
+          + '<span class="goal-min">' + (g.time ? esc(g.time) + "'" : '—') + '</span>'
           + flagImg(g.team, 18)
-          + '<span class="goal-player">' + g.name + '</span>'
-          + '<span class="goal-team">' + g.team + '</span>'
-          + (g.type && g.type !== 'Goal' ? '<span class="goal-type">' + g.type + '</span>' : '')
+          + '<span class="goal-player">' + esc(g.name) + '</span>'
+          + '<span class="goal-team">' + esc(g.team) + '</span>'
+          + (g.type && g.type !== 'Goal' && g.type !== 'Normal Goal' ? '<span class="goal-type">' + esc(g.type) + '</span>' : '')
           + '</div>';
       }).join('');
     } else {
@@ -768,23 +897,23 @@ function renderDrawerContent(f, withStats) {
   if (withStats && f.stats && f.stats.length) {
     statsHtml = '<div class="dsec">📊 Statistika</div><table class="statstbl">'
       + f.stats.map(function(s) {
-          return '<tr><td>' + (s.intHome||0) + '</td>'
-            + '<td style="text-align:center;color:var(--grey);font-size:.62rem;text-transform:uppercase;letter-spacing:.05em">' + s.strStat + '</td>'
-            + '<td style="text-align:right">' + (s.intAway||0) + '</td></tr>';
+          return '<tr><td>' + esc(s.intHome || 0) + '</td>'
+            + '<td>' + esc(s.strStat) + '</td>'
+            + '<td>' + esc(s.intAway || 0) + '</td></tr>';
         }).join('')
       + '</table>';
   }
 
   document.getElementById('drawer-body').innerHTML =
     '<div class="dscoreboard">'
-    + '<div class="dteam">' + flagImg(f.home, 48) + '<div class="dteam-name">' + f.home + '</div></div>'
+    + '<div class="dteam">' + flagImg(f.home, 48) + '<div class="dteam-name">' + esc(f.home) + '</div></div>'
     + '<div class="' + (done ? 'dscore' : 'dscore pend') + '">' + (done ? f.homeScore + ' — ' + f.awayScore : 'VS') + '</div>'
-    + '<div class="dteam">' + flagImg(f.away, 48) + '<div class="dteam-name">' + f.away + '</div></div>'
+    + '<div class="dteam">' + flagImg(f.away, 48) + '<div class="dteam-name">' + esc(f.away) + '</div></div>'
     + '</div>'
     + '<div class="dmeta-grid">'
-    + '<div class="dmeta-item"><div class="dmeta-label">Sana</div><div class="dmeta-val">' + fmtDate(f.date) + '</div></div>'
-    + '<div class="dmeta-item"><div class="dmeta-label">Soat (mahalliy)</div><div class="dmeta-val">' + fmtTime(f.time) + '</div></div>'
-    + '<div class="dmeta-item"><div class="dmeta-label">Stadion</div><div class="dmeta-val">' + (f.venue || '—') + '</div></div>'
+    + '<div class="dmeta-item"><div class="dmeta-label">Sana</div><div class="dmeta-val">' + fxDate(f) + '</div></div>'
+    + '<div class="dmeta-item"><div class="dmeta-label">Soat (mahalliy)</div><div class="dmeta-val">' + fxTime(f) + '</div></div>'
+    + '<div class="dmeta-item"><div class="dmeta-label">Stadion</div><div class="dmeta-val">' + (esc(f.venue) || '—') + '</div></div>'
     + '<div class="dmeta-item"><div class="dmeta-label">Holat</div><div class="dmeta-val"><span class="stbadge ' + sl[0] + '">' + sl[1] + '</span></div></div>'
     + '</div>'
     + scorersHtml
