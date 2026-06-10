@@ -11,15 +11,19 @@ const m = html.match(/<script>([\s\S]*)<\/script>/);
 if (!m) { console.error('FAIL: <script> blok topilmadi'); process.exit(1); }
 
 function makeEl() {
+  const attrs = {};
   return {
     innerHTML: '', textContent: '', className: '',
-    classList: { add() {}, remove() {} },
-    addEventListener() {}
+    classList: { add() {}, remove() {}, contains() { return false; } },
+    addEventListener() {},
+    setAttribute(k, v) { attrs[k] = v; },
+    getAttribute(k) { return attrs[k]; }
   };
 }
 const elements = {};
 const sandbox = {
   document: {
+    documentElement: makeEl(),
     getElementById(id) { if (!elements[id]) elements[id] = makeEl(); return elements[id]; },
     querySelectorAll() { return []; },
     addEventListener() {}
@@ -164,6 +168,39 @@ const scorers = Object.values(sandbox.allScorers);
 check('avtogol hisobga olinmaydi', !scorers.some(s => s.name === 'X. Defender'));
 const jim = scorers.find(s => s.name === 'R. Jiménez');
 check('penalti ham gol sanaladi (2 gol)', jim && jim.goals === 2, JSON.stringify(jim));
+
+console.log('\n[11] Mavzu (dark/light)');
+check('standart mavzu dark', sandbox.getPreferredTheme() === 'dark');
+sandbox.applyTheme('light');
+check('light qo\'llanadi', sandbox.curTheme === 'light'
+  && sandbox.document.documentElement.getAttribute('data-theme') === 'light');
+sandbox.toggleTheme();
+check('toggle dark ga qaytaradi', sandbox.curTheme === 'dark'
+  && sandbox.document.documentElement.getAttribute('data-theme') === 'dark');
+const themeBtn = sandbox.document.getElementById('themebtn');
+check('tugma ikonkasi yangilanadi', themeBtn.textContent === '☀️');
+const lightVars = html.match(/\[data-theme="light"\]\s*{([^}]*)}/);
+const darkVars = html.match(/:root\s*{([^}]*)}/);
+check('light va dark bir xil o\'zgaruvchilar to\'plamiga ega', (() => {
+  if (!lightVars || !darkVars) return false;
+  const names = b => new Set([...b.matchAll(/--[\w-]+/g)].map(x => x[0]));
+  const d = names(darkVars[1]), l = names(lightVars[1]);
+  return d.size === l.size && [...d].every(n => l.has(n));
+})());
+check('hardcoded oq/qora rang qolmagan (CSS asosiy bloklarda)', (() => {
+  const css = html.match(/<style>([\s\S]*)<\/style>/)[1];
+  // faqat var ta'riflaridan tashqarida qidiramiz
+  const body = css.replace(/:root\s*{[^}]*}/, '').replace(/\[data-theme="light"\]\s*{[^}]*}/, '');
+  return !/rgba\(255,255,255/.test(body) && !/rgba\(240,192,64/.test(body);
+})());
+
+console.log('\n[12] Kirish imkoniyati (a11y)');
+const card2 = sandbox.fixtureCard(FIXTURES[0], true);
+check('kartada tabindex va role bor', /tabindex="0"/.test(card2) && /role="button"/.test(card2));
+check('kartada aria-label bor', /aria-label="/.test(card2));
+check('drawer dialog roli bilan', /role="dialog"/.test(html) && /aria-modal="true"/.test(html));
+check('toast aria-live', /aria-live="polite"/.test(html));
+check('reduced-motion qo\'llab-quvvatlanadi', /prefers-reduced-motion/.test(html));
 
 console.log('\n──────────────────────────────');
 console.log(passed + ' o\'tdi, ' + failed + ' yiqildi');
