@@ -216,6 +216,56 @@ check('CSS: birinchi ustun cho\'ziluvchan, raqamlar nowrap', (() => {
 })());
 check('shortName boshqa nomlarni o\'zgartirmaydi', sandbox.shortName('Uzbekistan') === 'Uzbekistan');
 
-console.log('\n──────────────────────────────');
-console.log(passed + ' o\'tdi, ' + failed + ' yiqildi');
-process.exit(failed ? 1 : 0);
+(async () => {
+  console.log('\n[14] Chala gol ro\'yxati (API kechikishi)');
+  // f1 = Mexico 2-1 South Africa (5-bo'limda o'rnatilgan)
+  const fx = FIXTURES.find(f => f.home === 'Mexico' && f.away === 'South Africa');
+
+  // API timeline: bitta normal gol + bitta nomi kiritilmagan kichik harfli "goal"
+  sandbox.fetch = () => Promise.resolve({
+    json: () => Promise.resolve({
+      timeline: [
+        { strTimeline: 'Goal', strPlayer: 'Julián Quiñones', intTime: '9', strTimelineDetail: 'Normal Goal', strHome: 'Yes' },
+        { strTimeline: 'goal', strPlayer: '', intTime: '67', strTimelineDetail: 'Normal Goal', strHome: 'Yes' }
+      ]
+    })
+  });
+  await sandbox.loadEventScorers(fx);
+  check('kichik harfli "goal" ham qabul qilinadi', fx.homeScorers.length === 2,
+    'topildi: ' + fx.homeScorers.length);
+  check('nomsiz gol tashlab yuborilmaydi', fx.homeScorers.some(s => s.name === ''));
+
+  sandbox.renderDrawerContent(fx);
+  const drawerHtml = sandbox.document.getElementById('drawer-body').innerHTML;
+  check('nomsiz gol "Noma\'lum o\'yinchi" deb ko\'rsatiladi', drawerHtml.indexOf("Noma'lum o'yinchi") >= 0);
+  check('2 gol ro\'yxatda, ogohlantirish yo\'q (3 gol bor, 2 ko\'rinadi → ogohlantirish bor)',
+    drawerHtml.indexOf('1 ta gol tafsiloti API da hali kiritilmagan') >= 0);
+
+  sandbox.buildScorerTotals();
+  check('nomsiz gol to\'purarlar reytingiga kirmaydi',
+    !Object.keys(sandbox.allScorers).some(k => k === ''));
+
+  // Hisob to'liq qoplangan holat — ogohlantirish chiqmasligi kerak
+  fx.awayScorers = [{ name: 'B. Player', time: '80', type: 'Normal Goal' }];
+  fx.homeScorers.push({ name: 'C. Player', time: '88', type: 'Normal Goal' });
+  // endi 3+1 = 4 > 3 — missing manfiy, ogohlantirish yo'q
+  sandbox.renderDrawerContent(fx);
+  check('ro\'yxat to\'liq bo\'lsa ogohlantirish chiqmaydi',
+    sandbox.document.getElementById('drawer-body').innerHTML.indexOf('kiritilmagan') < 0);
+
+  // 0-0 o'yin
+  const fx0 = FIXTURES.find(f => f.home === 'Canada');
+  fx0.homeScore = 0; fx0.awayScore = 0; fx0.status = 'Match Finished';
+  sandbox.renderDrawerContent(fx0);
+  check('0-0 da "gol bo\'lmagan" yozuvi', sandbox.document.getElementById('drawer-body').innerHTML.indexOf("gol bo'lmagan") >= 0);
+  fx0.homeScore = null; fx0.awayScore = null; fx0.status = 'NS';
+
+  // Qayta ochilganda statistika yo'qolmasligi (withStats parametri olib tashlandi)
+  fx.stats = [{ strStat: 'Total Shots', intHome: 16, intAway: 3 }];
+  sandbox.renderDrawerContent(fx);
+  check('statistika har ochilishda ko\'rinadi', sandbox.document.getElementById('drawer-body').innerHTML.indexOf('Total Shots') >= 0);
+
+  console.log('\n──────────────────────────────');
+  console.log(passed + ' o\'tdi, ' + failed + ' yiqildi');
+  process.exit(failed ? 1 : 0);
+})().catch(e => { console.error('FAIL (async):', e); process.exit(1); });

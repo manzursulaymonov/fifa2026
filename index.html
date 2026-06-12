@@ -738,8 +738,10 @@ function loadEventScorers(fix) {
       fix.homeScorers = [];
       fix.awayScorers = [];
       (data.timeline || []).forEach(function(t) {
-        if (t.strTimeline !== 'Goal' || !t.strPlayer) return;
-        var entry = { name: t.strPlayer, time: t.intTime || '', type: t.strTimelineDetail || 'Goal' };
+        // "Goal"/"goal" kabi variantlarni qabul qilamiz; o'yinchi nomi
+        // kiritilmagan gol ham ro'yxatda qolsin (nomi keyin to'ldiriladi)
+        if (!/goal/i.test(t.strTimeline || '')) return;
+        var entry = { name: t.strPlayer || '', time: t.intTime || '', type: t.strTimelineDetail || 'Goal' };
         var isHome = (t.strHome === 'Yes') !== fix.apiSwapped;
         if (isHome) fix.homeScorers.push(entry);
         else fix.awayScorers.push(entry);
@@ -965,16 +967,28 @@ function openDrawer(fixId) {
   openDrawerId = fixId;
   document.getElementById('drawer-title').textContent = 'Guruh ' + f.group + ' · ' + fxDate(f);
   document.getElementById('drawer-overlay').classList.add('open');
-  renderDrawerContent(f, false);
+  renderDrawerContent(f);
 
-  if (f.apiId && f.homeScore !== null && !f.stats) {
-    loadEventStats(f).then(function() {
-      if (openDrawerId === fixId) renderDrawerContent(f, true);
-    });
+  if (f.apiId && f.homeScore !== null) {
+    var jobs = [];
+    if (!f.stats) jobs.push(loadEventStats(f));
+    // Gol ro'yxati hisobdan kam bo'lsa — API da keyin to'ldirilgan
+    // bo'lishi mumkin, qayta so'raymiz
+    if (f.homeScorers.length + f.awayScorers.length < f.homeScore + f.awayScore) {
+      jobs.push(loadEventScorers(f).then(function() {
+        buildScorerTotals();
+        if (curPage === 'scorers') renderScorers();
+      }));
+    }
+    if (jobs.length) {
+      Promise.all(jobs).then(function() {
+        if (openDrawerId === fixId) renderDrawerContent(f);
+      });
+    }
   }
 }
 
-function renderDrawerContent(f, withStats) {
+function renderDrawerContent(f) {
   var done = f.homeScore !== null;
   var sl = statusLabel(f);
 
@@ -990,18 +1004,23 @@ function renderDrawerContent(f, withStats) {
         return '<div class="goal-row">'
           + '<span class="goal-min">' + (g.time ? esc(g.time) + "'" : '—') + '</span>'
           + flagImg(g.team, 18)
-          + '<span class="goal-player">' + esc(g.name) + '</span>'
+          + '<span class="goal-player">' + (esc(g.name) || "Noma'lum o'yinchi") + '</span>'
           + '<span class="goal-team">' + esc(g.team) + '</span>'
           + (g.type && g.type !== 'Goal' && g.type !== 'Normal Goal' ? '<span class="goal-type">' + esc(g.type) + '</span>' : '')
           + '</div>';
       }).join('');
-    } else {
-      scorersHtml += '<div class="dnote">API da gol ma\'lumoti yo\'q</div>';
+    }
+    var totalGoals = f.homeScore + f.awayScore;
+    var missing = totalGoals - allGoals.length;
+    if (totalGoals === 0) {
+      scorersHtml += '<div class="dnote">Bu o\'yinda gol bo\'lmagan</div>';
+    } else if (missing > 0) {
+      scorersHtml += '<div class="dnote">⚠️ ' + missing + ' ta gol tafsiloti API da hali kiritilmagan</div>';
     }
   }
 
   var statsHtml = '';
-  if (withStats && f.stats && f.stats.length) {
+  if (f.stats && f.stats.length) {
     statsHtml = '<div class="dsec">📊 Statistika</div><table class="statstbl">'
       + f.stats.map(function(s) {
           return '<tr><td>' + esc(s.intHome || 0) + '</td>'
