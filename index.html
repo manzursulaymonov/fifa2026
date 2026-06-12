@@ -282,7 +282,7 @@ main { position: relative; z-index: 1; max-width: 1440px; margin: 0 auto; paddin
   <div id="page-scorers" class="page">
     <div class="sec">Gol Uruvchilar</div>
     <div class="note">
-      ⚽ Gol ma'lumotlari <strong>TheSportsDB API</strong> dan avtomatik yuklanadi. O'yinlar boshlanishi bilan bu yerda ko'rinadi.
+      ⚽ Gol ma'lumotlari ochiq manbalardan (<strong>FIFA</strong>, <strong>openfootball</strong>, <strong>TheSportsDB</strong>) avtomatik yuklanadi. O'yinlar boshlanishi bilan bu yerda ko'rinadi.
     </div>
     <div id="scorer-list" class="scorerlist">
       <div class="skel" style="height:60px"></div>
@@ -442,6 +442,8 @@ Object.keys(GROUPS).forEach(function(g) {
       status: 'NS',
       apiId: null,
       apiSwapped: false,
+      scoreSource: null,
+      goalsSource: null,
       homeScorers: [],
       awayScorers: [],
       stats: null
@@ -660,8 +662,99 @@ function matchFixture(ev) {
 }
 
 // ═══════════════════════════════════════════════════
-// API LOADING
+// API LOADING — uch mustaqil manba, ustuvorlik tartibida:
+//   1) api.fifa.com (rasmiy)  — hisob, holat (jonli), stadion
+//   2) openfootball (GitHub)  — tasdiqlangan gol ro'yxatlari
+//   3) TheSportsDB            — statistika, timeline va to'liq zaxira
+// Har biri yiqilsa, qolganlari ishlayveradi.
 // ═══════════════════════════════════════════════════
+var FIFA_URL = 'https://api.fifa.com/api/v3/calendar/matches?idCompetition=17&from=2026-06-01T00:00:00Z&to=2026-07-31T23:59:59Z&language=en&count=500';
+var OF_URL = 'https://raw.githubusercontent.com/openfootball/worldcup.json/master/2026/worldcup.json';
+
+function fetchJson(url) {
+  return fetch(url).then(function(r) {
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    return r.json();
+  });
+}
+
+// FIFA: Results[i] = { Home/Away: {TeamName:[{Description}], Score},
+//   MatchStatus (0=tugagan, 3=jonli), Stadium: {Name:[...], CityName:[...]} }
+function applyFifa(data) {
+  var matched = 0;
+  ((data && data.Results) || []).forEach(function(r) {
+    try {
+      var hn = r.Home && r.Home.TeamName && r.Home.TeamName[0] && r.Home.TeamName[0].Description;
+      var an = r.Away && r.Away.TeamName && r.Away.TeamName[0] && r.Away.TeamName[0].Description;
+      if (!hn || !an) return;
+      var m = matchFixture({ strHomeTeam: hn, strAwayTeam: an });
+      if (!m) return;
+      var fix = m.fix;
+      if (r.Stadium && r.Stadium.Name && r.Stadium.Name[0]) {
+        var city = r.Stadium.CityName && r.Stadium.CityName[0] ? ', ' + r.Stadium.CityName[0].Description : '';
+        fix.venue = r.Stadium.Name[0].Description + city;
+      }
+      if (r.MatchStatus === 3) fix.status = 'LIVE';
+      else if (r.MatchStatus === 0) fix.status = 'FT';
+      var hs = m.swapped ? r.Away.Score : r.Home.Score;
+      var as = m.swapped ? r.Home.Score : r.Away.Score;
+      if (typeof hs === 'number' && typeof as === 'number' && (r.MatchStatus === 0 || r.MatchStatus === 3)) {
+        fix.homeScore = hs;
+        fix.awayScore = as;
+        fix.scoreSource = 'fifa';
+        matched++;
+      }
+    } catch (e) {}
+  });
+  return matched;
+}
+
+// openfootball: matches[i] = { team1, team2 (satr yoki {name}),
+//   score: {ft:[a,b]}, goals1/goals2: [{name, minute, penalty?, owngoal?}] }
+function applyOpenfootball(data) {
+  var used = 0;
+  ((data && data.matches) || []).forEach(function(mt) {
+    try {
+      var t1 = typeof mt.team1 === 'string' ? mt.team1 : (mt.team1 && mt.team1.name);
+      var t2 = typeof mt.team2 === 'string' ? mt.team2 : (mt.team2 && mt.team2.name);
+      if (!t1 || !t2) return;
+      var m = matchFixture({ strHomeTeam: t1, strAwayTeam: t2 });
+      if (!m) return;
+      var fix = m.fix;
+      var s1 = null, s2 = null;
+      if (mt.score && mt.score.ft && mt.score.ft.length === 2) { s1 = mt.score.ft[0]; s2 = mt.score.ft[1]; }
+      else if (typeof mt.score1 === 'number' && typeof mt.score2 === 'number') { s1 = mt.score1; s2 = mt.score2; }
+      if (typeof s1 !== 'number' || typeof s2 !== 'number') return;
+      var hs = m.swapped ? s2 : s1;
+      var as = m.swapped ? s1 : s2;
+      if (fix.homeScore === null) {
+        fix.homeScore = hs;
+        fix.awayScore = as;
+        fix.status = 'FT';
+        fix.scoreSource = 'of';
+      }
+      // Gol ro'yxati hisobni to'liq qoplasagina ishonchli manba deb olamiz
+      var g1 = mt.goals1 || [], g2 = mt.goals2 || [];
+      if (hs + as > 0 && g1.length + g2.length === hs + as) {
+        var conv = function(g) {
+          return {
+            name: g.name || '',
+            time: g.minute != null ? String(g.minute) : '',
+            type: g.penalty ? 'Penalty' : (g.owngoal ? 'Own Goal' : 'Normal Goal')
+          };
+        };
+        fix.homeScorers = (m.swapped ? g2 : g1).map(conv);
+        fix.awayScorers = (m.swapped ? g1 : g2).map(conv);
+        fix.goalsSource = 'of';
+        used++;
+      }
+    } catch (e) {}
+  });
+  return used;
+}
+
+// TheSportsDB: FIFA hisob bergan o'yinlarni qayta yozmaydi,
+// lekin apiId ni doim saqlaydi (statistika/timeline uchun kerak)
 function applyEvents(events) {
   var matched = 0;
   events.forEach(function(ev) {
@@ -670,49 +763,72 @@ function applyEvents(events) {
     var fix = m.fix;
     fix.apiId = ev.idEvent;
     fix.apiSwapped = m.swapped;
-    if (ev.strVenue) fix.venue = ev.strVenue;
+    if (ev.strVenue && fix.scoreSource !== 'fifa') fix.venue = ev.strVenue;
     var hs = parseInt(m.swapped ? ev.intAwayScore : ev.intHomeScore, 10);
     var as = parseInt(m.swapped ? ev.intHomeScore : ev.intAwayScore, 10);
     if (!isNaN(hs) && !isNaN(as)) {
-      fix.homeScore = hs;
-      fix.awayScore = as;
-      fix.status = ev.strStatus || 'FT';
+      if (fix.scoreSource !== 'fifa') {
+        fix.homeScore = hs;
+        fix.awayScore = as;
+        fix.status = ev.strStatus || 'FT';
+        fix.scoreSource = 'tsdb';
+      }
       matched++;
-    } else {
+    } else if (fix.scoreSource !== 'fifa') {
       fix.status = ev.strStatus || 'NS';
     }
   });
   return matched;
 }
 
-function loadAll() {
-  setApi('spin', 'API...');
+function loadTsdbEvents() {
   // TheSportsDB da JCh mavsumi "2026"; eski "2025-2026" zaxira sifatida
-  fetch(API_BASE + '/eventsseason.php?id=' + LEAGUE_ID + '&s=2026')
-    .then(function(r) { return r.json(); })
+  return fetchJson(API_BASE + '/eventsseason.php?id=' + LEAGUE_ID + '&s=2026')
     .then(function(data) {
       var events = data.events || [];
       if (events.length) return events;
-      return fetch(API_BASE + '/eventsseason.php?id=' + LEAGUE_ID + '&s=2025-2026')
-        .then(function(r) { return r.json(); })
+      return fetchJson(API_BASE + '/eventsseason.php?id=' + LEAGUE_ID + '&s=2025-2026')
         .then(function(d2) { return d2.events || []; });
+    });
+}
+
+function loadAll() {
+  setApi('spin', 'API...');
+  var sources = [];
+  fetchJson(FIFA_URL)
+    .then(function(d) { applyFifa(d); sources.push('FIFA'); })
+    .catch(function() {})
+    .then(function() {
+      return loadTsdbEvents()
+        .then(function(events) { applyEvents(events); if (events.length) sources.push('TSDB'); })
+        .catch(function() {});
     })
-    .then(function(events) {
-      var matched = applyEvents(events);
-      setApi('ok', events.length + " o'yin · " + matched + ' natija');
+    .then(function() {
+      return fetchJson(OF_URL)
+        .then(function(d) { applyOpenfootball(d); if (d && d.matches && d.matches.length) sources.push('OF'); })
+        .catch(function() {});
+    })
+    .then(function() {
+      var results = FIXTURES.filter(function(f) { return f.homeScore !== null; }).length;
+      if (sources.length) {
+        setApi('ok', sources.join('+') + ' · ' + results + ' natija');
+      } else {
+        setApi('err', 'API xatosi');
+        showToast("API ga ulanib bo'lmadi", true);
+      }
+      buildScorerTotals();
       renderAll();
       if (curPage === 'groups') renderGroups();
       if (curPage === 'matches') renderMatches();
+      if (curPage === 'scorers') renderScorers();
       loadAllScorers();
-    })
-    .catch(function(e) {
-      setApi('err', 'API xatosi');
-      showToast("API ga ulanib bo'lmadi", true);
     });
 }
 
 function loadAllScorers() {
-  var finished = FIXTURES.filter(function(f) { return f.apiId && f.homeScore !== null; });
+  var finished = FIXTURES.filter(function(f) {
+    return f.apiId && f.homeScore !== null && f.goalsSource !== 'of';
+  });
   var i = 0;
   function next() {
     if (i >= finished.length) {
@@ -973,8 +1089,9 @@ function openDrawer(fixId) {
     var jobs = [];
     if (!f.stats) jobs.push(loadEventStats(f));
     // Gol ro'yxati hisobdan kam bo'lsa — API da keyin to'ldirilgan
-    // bo'lishi mumkin, qayta so'raymiz
-    if (f.homeScorers.length + f.awayScorers.length < f.homeScore + f.awayScore) {
+    // bo'lishi mumkin, qayta so'raymiz (openfootball ro'yxati to'liq keladi)
+    if (f.goalsSource !== 'of'
+        && f.homeScorers.length + f.awayScorers.length < f.homeScore + f.awayScore) {
       jobs.push(loadEventScorers(f).then(function() {
         buildScorerTotals();
         if (curPage === 'scorers') renderScorers();

@@ -217,6 +217,53 @@ check('CSS: birinchi ustun cho\'ziluvchan, raqamlar nowrap', (() => {
 check('shortName boshqa nomlarni o\'zgartirmaydi', sandbox.shortName('Uzbekistan') === 'Uzbekistan');
 
 (async () => {
+  console.log('\n[15] FIFA API parseri (applyFifa)');
+  const fE = FIXTURES.find(f => f.home === 'Germany' && f.away === 'Curaçao');
+  const fE2 = FIXTURES.find(f => f.home === 'Netherlands' && f.away === 'Japan');
+  sandbox.applyFifa({ Results: [
+    { Home: { TeamName: [{ Description: 'Germany' }], Score: 3 },
+      Away: { TeamName: [{ Description: 'Curacao' }], Score: 0 },
+      MatchStatus: 0,
+      Stadium: { Name: [{ Description: 'NRG Stadium' }], CityName: [{ Description: 'Houston' }] } },
+    { Home: { TeamName: [{ Description: 'Japan' }], Score: 1 },
+      Away: { TeamName: [{ Description: 'Netherlands' }], Score: 2 },
+      MatchStatus: 3 },
+    { Home: { TeamName: [{ Description: 'To Be Determined' }] }, Away: {} }
+  ] });
+  check('FIFA hisobi qabul qilindi (3-0)', fE.homeScore === 3 && fE.awayScore === 0 && fE.scoreSource === 'fifa');
+  check('FIFA stadioni shahar bilan', fE.venue === 'NRG Stadium, Houston');
+  check('teskari jonli o\'yin: hisob almashtirildi, JONLI', fE2.homeScore === 2 && fE2.awayScore === 1
+    && sandbox.statusLabel(fE2)[1] === 'JONLI');
+  check('TBD/yaroqsiz yozuv xatosiz o\'tkazib yuboriladi', true);
+
+  console.log('\n[16] Manbalar ustuvorligi');
+  sandbox.applyEvents([{ idEvent: 'ts9', strHomeTeam: 'Germany', strAwayTeam: 'Curacao',
+    intHomeScore: '1', intAwayScore: '1', strStatus: 'Match Finished', strVenue: 'Wrong Venue' }]);
+  check('TSDB FIFA hisobini qayta yozmaydi', fE.homeScore === 3 && fE.awayScore === 0 && fE.scoreSource === 'fifa');
+  check('TSDB stadioni FIFA nikini almashtirmaydi', fE.venue === 'NRG Stadium, Houston');
+  check('TSDB apiId baribir saqlanadi (statistika uchun)', fE.apiId === 'ts9');
+
+  console.log('\n[17] openfootball parseri (applyOpenfootball)');
+  const fL = FIXTURES.find(f => f.home === 'England' && f.away === 'Croatia');
+  sandbox.applyOpenfootball({ matches: [
+    { team1: 'England', team2: 'Croatia', score: { ft: [2, 1] },
+      goals1: [{ name: 'H. Kane', minute: 23, penalty: true }, { name: 'J. Bellingham', minute: 70 }],
+      goals2: [{ name: 'L. Modric', minute: 55 }] },
+    { team1: 'Ghana', team2: 'Panama' } // hisobsiz — o'tkazib yuboriladi
+  ] });
+  check('openfootball hisobi (2-1)', fL.homeScore === 2 && fL.awayScore === 1 && fL.scoreSource === 'of');
+  check('gollar to\'liq qabul qilindi', fL.goalsSource === 'of'
+    && fL.homeScorers.length === 2 && fL.awayScorers.length === 1);
+  check('penalti turi belgilandi', fL.homeScorers[0].type === 'Penalty' && fL.homeScorers[0].time === '23');
+  const fL2 = FIXTURES.find(f => f.home === 'Ghana' && f.away === 'Panama');
+  check('hisobsiz o\'yin tegmagan', fL2.homeScore === null);
+  // chala gol ro'yxati ishlatilmasligi
+  const fK = FIXTURES.find(f => f.home === 'Portugal' && f.away === 'DR Congo');
+  sandbox.applyOpenfootball({ matches: [
+    { team1: 'Portugal', team2: 'Congo DR', score: { ft: [3, 0] }, goals1: [{ name: 'X', minute: 10 }], goals2: [] }
+  ] });
+  check('chala gol ro\'yxati (1/3) goalsSource bo\'lmaydi', fK.homeScore === 3 && fK.goalsSource !== 'of');
+
   console.log('\n[14] Chala gol ro\'yxati (API kechikishi)');
   // f1 = Mexico 2-1 South Africa (5-bo'limda o'rnatilgan)
   const fx = FIXTURES.find(f => f.home === 'Mexico' && f.away === 'South Africa');
