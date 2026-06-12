@@ -30,7 +30,9 @@ const sandbox = {
   },
   // API chaqiruvlari testda bo'sh javob qaytaradi
   fetch() { return Promise.resolve({ json: () => Promise.resolve({}) }); },
-  setTimeout, clearTimeout, console, Promise, Object, Date, Math, String, parseInt, isNaN
+  setTimeout, clearTimeout, console, Promise, Object, Date, Math, String, parseInt, isNaN,
+  // intervalni testda ishga tushirmaymiz
+  setInterval: () => 0, clearInterval: () => {}
 };
 vm.createContext(sandbox);
 vm.runInContext(m[1], sandbox);
@@ -311,6 +313,22 @@ check('shortName boshqa nomlarni o\'zgartirmaydi', sandbox.shortName('Uzbekistan
   fx.stats = [{ strStat: 'Total Shots', intHome: 16, intAway: 3 }];
   sandbox.renderDrawerContent(fx);
   check('statistika har ochilishda ko\'rinadi', sandbox.document.getElementById('drawer-body').innerHTML.indexOf('Total Shots') >= 0);
+
+  console.log('\n[18] Avtomatik yangilanish');
+  check('3 daqiqalik interval o\'rnatilgan', /setInterval\([\s\S]{0,200}180000\)/.test(html));
+  check('yashirin sahifada yangilanmaydi', /document\.hidden/.test(html));
+  check('sahifaga qaytganda yangilanadi', /visibilitychange/.test(html));
+  // parallel ishga tushishdan himoya
+  let fetchCount = 0;
+  sandbox.fetch = () => { fetchCount++; return Promise.resolve({ json: () => Promise.resolve({}) }); };
+  sandbox.apiLoading = true;
+  sandbox.loadAll();
+  check('apiLoading paytida qayta yuklamaydi', fetchCount === 0);
+  sandbox.apiLoading = false;
+  // gol ro'yxati to'liq o'yinlar uchun takror so'rov yuborilmaydi
+  FIXTURES.forEach(f => { if (f.homeScore !== null) { f.goalsSource = 'of'; } });
+  sandbox.loadAllScorers();
+  check('to\'liq/of o\'yinlarga scorer so\'rovi yo\'q', fetchCount === 0);
 
   console.log('\n──────────────────────────────');
   console.log(passed + ' o\'tdi, ' + failed + ' yiqildi');

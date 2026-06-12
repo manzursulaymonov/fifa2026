@@ -792,7 +792,11 @@ function loadTsdbEvents() {
     });
 }
 
+var apiLoading = false;
+
 function loadAll() {
+  if (apiLoading) return;
+  apiLoading = true;
   setApi('spin', 'API...');
   var sources = [];
   fetchJson(FIFA_URL)
@@ -822,12 +826,16 @@ function loadAll() {
       if (curPage === 'matches') renderMatches();
       if (curPage === 'scorers') renderScorers();
       loadAllScorers();
+      apiLoading = false;
     });
 }
 
 function loadAllScorers() {
+  // Faqat gol ro'yxati hisobni qoplamagan o'yinlar uchun so'raymiz —
+  // takroriy yangilanishlarda ortiqcha trafik bo'lmasin
   var finished = FIXTURES.filter(function(f) {
-    return f.apiId && f.homeScore !== null && f.goalsSource !== 'of';
+    return f.apiId && f.homeScore !== null && f.goalsSource !== 'of'
+      && f.homeScorers.length + f.awayScorers.length < f.homeScore + f.awayScore;
   });
   var i = 0;
   function next() {
@@ -1236,6 +1244,17 @@ try {
   });
 } catch (e) {}
 loadAll();
+// Jonli kuzatuv: har 3 daqiqada yangilanadi (faqat sahifa ochiq bo'lsa)
+setInterval(function() {
+  try { if (document.hidden) return; } catch (e) {}
+  loadAll();
+}, 180000);
+// Sahifaga qaytganda darhol yangilash
+try {
+  document.addEventListener('visibilitychange', function() {
+    if (!document.hidden) loadAll();
+  });
+} catch (e) {}
 </script>
 </body>
 </html>
