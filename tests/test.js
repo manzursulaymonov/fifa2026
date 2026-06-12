@@ -330,6 +330,35 @@ check('shortName boshqa nomlarni o\'zgartirmaydi', sandbox.shortName('Uzbekistan
   sandbox.loadAllScorers();
   check('to\'liq/of o\'yinlarga scorer so\'rovi yo\'q', fetchCount === 0);
 
+  console.log('\n[19] Jonli o\'yin daqiqasi');
+  const fG = FIXTURES.find(f => f.home === 'Belgium' && f.away === 'Egypt');
+  sandbox.applyFifa({ Results: [
+    { Home: { TeamName: [{ Description: 'Belgium' }], Score: 1 },
+      Away: { TeamName: [{ Description: 'Egypt' }], Score: 0 },
+      MatchStatus: 3, MatchTime: "67'" }
+  ] });
+  check('daqiqa saqlandi', fG.minute === "67'");
+  check('liveMinute jonlida daqiqani beradi', sandbox.liveMinute(fG) === "67'");
+  const liveCard = sandbox.fixtureCard(fG, true);
+  check('kartada hisob ostida daqiqa bor', /live-min">67(&#39;|')<\/span>/.test(liveCard) && /fscore live/.test(liveCard));
+  sandbox.renderDrawerContent(fG);
+  check('drawerda ham daqiqa bor', sandbox.document.getElementById('drawer-body').innerHTML.indexOf('dlive-min') >= 0);
+  // tanaffus
+  sandbox.applyFifa({ Results: [
+    { Home: { TeamName: [{ Description: 'Belgium' }], Score: 1 },
+      Away: { TeamName: [{ Description: 'Egypt' }], Score: 0 },
+      MatchStatus: 3, Period: 4, MatchTime: "45'" }
+  ] });
+  check('tanaffusda "Tanaffus"', sandbox.liveMinute(fG) === 'Tanaffus');
+  // o'yin tugagach daqiqa yo'qoladi
+  sandbox.applyFifa({ Results: [
+    { Home: { TeamName: [{ Description: 'Belgium' }], Score: 2 },
+      Away: { TeamName: [{ Description: 'Egypt' }], Score: 0 },
+      MatchStatus: 0 }
+  ] });
+  check('tugagach daqiqa ko\'rsatilmaydi', sandbox.liveMinute(fG) === '' && fG.minute === null);
+  check('kutilayotgan o\'yinda daqiqa yo\'q', sandbox.liveMinute({ status: 'NS', minute: "10'" }) === '');
+
   console.log('\n──────────────────────────────');
   console.log(passed + ' o\'tdi, ' + failed + ' yiqildi');
   process.exit(failed ? 1 : 0);

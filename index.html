@@ -125,6 +125,9 @@ main { position: relative; z-index: 1; max-width: 1440px; margin: 0 auto; paddin
 .stbadge { font-size: .58rem; font-weight: 700; text-transform: uppercase; letter-spacing: .07em; padding: .15rem .45rem; border-radius: 3px; }
 .st-done { background: var(--okbg); color: var(--lime2); }
 .st-live { background: var(--livebg); color: var(--red); animation: blink .9s infinite; }
+.fscore.live { flex-direction: column; line-height: 1.1; gap: .05rem; }
+.live-min { font-size: .6rem; color: var(--red); font-family: 'DM Mono'; letter-spacing: .05em; animation: blink 1.4s infinite; }
+.dlive-min { font-size: .8rem; color: var(--red); font-family: 'DM Mono'; margin-top: .35rem; animation: blink 1.4s infinite; }
 .st-soon { background: var(--soonbg); color: var(--gold2); }
 
 /* GROUPS */
@@ -440,6 +443,7 @@ Object.keys(GROUPS).forEach(function(g) {
       homeScore: null,
       awayScore: null,
       status: 'NS',
+      minute: null,
       apiId: null,
       apiSwapped: false,
       scoreSource: null,
@@ -694,8 +698,14 @@ function applyFifa(data) {
         var city = r.Stadium.CityName && r.Stadium.CityName[0] ? ', ' + r.Stadium.CityName[0].Description : '';
         fix.venue = r.Stadium.Name[0].Description + city;
       }
-      if (r.MatchStatus === 3) fix.status = 'LIVE';
-      else if (r.MatchStatus === 0) fix.status = 'FT';
+      if (r.MatchStatus === 3) {
+        fix.status = 'LIVE';
+        // MatchTime: "67'" ko'rinishida; Period 4 = tanaffus
+        fix.minute = r.Period === 4 ? 'HT' : (r.MatchTime || '');
+      } else if (r.MatchStatus === 0) {
+        fix.status = 'FT';
+        fix.minute = null;
+      }
       var hs = m.swapped ? r.Away.Score : r.Home.Score;
       var as = m.swapped ? r.Home.Score : r.Away.Score;
       if (typeof hs === 'number' && typeof as === 'number' && (r.MatchStatus === 0 || r.MatchStatus === 3)) {
@@ -920,6 +930,14 @@ function statusLabel(f) {
   return ['st-soon', 'Kutilmoqda'];
 }
 
+// Jonli o'yinning joriy daqiqasi (faqat jonli holatda)
+function liveMinute(f) {
+  var s = String(f.status || '').toUpperCase().trim();
+  if (LIVE_STATUSES.indexOf(s) < 0) return '';
+  if (s === 'HT' || s === 'HALFTIME' || s === 'HALF TIME' || f.minute === 'HT') return 'Tanaffus';
+  return f.minute || '';
+}
+
 function standings(group) {
   var t = {};
   GROUPS[group].forEach(function(n) { t[n] = {name:n,p:0,w:0,d:0,l:0,gf:0,ga:0,pts:0}; });
@@ -959,6 +977,7 @@ function fixtureCard(f, showGroup) {
   var done = f.homeScore !== null;
   var sl = statusLabel(f);
   var stClass = sl[0], stText = sl[1];
+  var lm = liveMinute(f);
   var venue = f.venue ? f.venue.split('(')[0].trim() : '';
   return '<div class="fcard" tabindex="0" role="button" onclick="openDrawer(\'' + f.id + '\')"'
     + ' aria-label="' + esc(f.home) + ' — ' + esc(f.away) + '">'
@@ -971,9 +990,10 @@ function fixtureCard(f, showGroup) {
     +   '<span>' + esc(f.home) + '</span>'
     +   flagImg(f.home, 26)
     + '</div>'
-    + '<div class="fscore' + (done ? '' : ' pend') + '">'
+    + '<div class="fscore' + (done ? (lm ? ' live' : '') : ' pend') + '">'
     +   (done
           ? f.homeScore + ' &mdash; ' + f.awayScore
+            + (lm ? '<span class="live-min">' + esc(lm) + '</span>' : '')
           : '<span class="pend-date">' + fxDate(f) + '</span><span class="pend-time">' + fxTime(f) + '</span>'
         )
     + '</div>'
@@ -1158,7 +1178,9 @@ function renderDrawerContent(f) {
   document.getElementById('drawer-body').innerHTML =
     '<div class="dscoreboard">'
     + '<div class="dteam">' + flagImg(f.home, 48) + '<div class="dteam-name">' + esc(f.home) + '</div></div>'
-    + '<div class="' + (done ? 'dscore' : 'dscore pend') + '">' + (done ? f.homeScore + ' — ' + f.awayScore : 'VS') + '</div>'
+    + '<div class="' + (done ? 'dscore' : 'dscore pend') + '">' + (done ? f.homeScore + ' — ' + f.awayScore : 'VS')
+    +   (liveMinute(f) ? '<div class="dlive-min">' + esc(liveMinute(f)) + '</div>' : '')
+    + '</div>'
     + '<div class="dteam">' + flagImg(f.away, 48) + '<div class="dteam-name">' + esc(f.away) + '</div></div>'
     + '</div>'
     + '<div class="dmeta-grid">'
