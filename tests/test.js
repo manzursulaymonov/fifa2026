@@ -472,15 +472,33 @@ check('shortName boshqa nomlarni o\'zgartirmaydi', sandbox.shortName('Uzbekistan
   check('o\'ynalmagan guruhda hech kim eliminatsiya emas',
     Object.keys(anEmpty).every(k => !anEmpty[k].eliminated && !anEmpty[k].clinched));
 
-  // 2 o'yin qolganda (MD3 sinxron) hech kim eliminatsiya bo\'lmaydi:
-  // guruh D ga 4 o'yin qo'yamiz (har jamoa 1 o'yindan qoladi)
-  setScore('USA', 'Paraguay', 1, 0);
-  setScore('Australia', 'Türkiye', 1, 0);
-  setScore('USA', 'Australia', 1, 0);
-  setScore('Türkiye', 'Paraguay', 0, 0);
+  // O'ZARO O'YIN orqali eliminatsiya (foydalanuvchi misoli, guruh D):
+  // USA 6, Australia 3, Paraguay 3, Türkiye 0. Qolgan: Türkiye-USA, Paraguay-Australia.
+  // Türkiye AQShni yutsa ham 3 ochko; Paraguay/Australiadan biri 3 ochkoda qoladi,
+  // Türkiye esa ularning IKKALASIGA ham o'zaro o'yinda yutqazgan → har doim 4-o'rin.
+  setScore('USA', 'Paraguay', 4, 1);
+  setScore('Australia', 'Türkiye', 2, 0);
+  setScore('USA', 'Australia', 2, 0);
+  setScore('Türkiye', 'Paraguay', 0, 1);
   const anD = sandbox.analyzeGroup('D');
-  check('har jamoa 1 o\'yindan qolsa — hech kim eliminatsiya emas',
-    Object.keys(anD).every(k => !anD[k].eliminated));
+  check('Türkiye o\'zaro o\'yin hisobiga matematik eliminatsiya', anD['Türkiye'].eliminated === true);
+  check('USA top-2 ni kafolatladi', anD['USA'].clinched === true);
+  check('Australia hali tirik', anD['Australia'].eliminated === false);
+  check('Paraguay hali tirik', anD['Paraguay'].eliminated === false);
+
+  // NOTO'G'RI eliminatsiya bo'lmasligi: agar 4-o'rindagi jamoa raqibini
+  // o'zaro o'yinda YUTGAN bo'lsa (o'zaro o'yin sikli) — u hali tirik.
+  // Guruh E: Germany 6; Ivory Coast Ecuador'ni yutgan, Ecuador Curaçao'ni yutgan,
+  // Curaçao Ivory Coast'ni yutgan (sikl), hammasi 3 ochko bo'lishi mumkin.
+  setScore('Germany', 'Curaçao', 3, 0);
+  setScore('Ivory Coast', 'Ecuador', 1, 0);
+  setScore('Germany', 'Ivory Coast', 2, 0);
+  setScore('Ecuador', 'Curaçao', 1, 0);   // Ecuador Curaçao'ni yutdi
+  // qolgan: Germany-Ecuador, Curaçao-Ivory Coast
+  const anE = sandbox.analyzeGroup('E');
+  check('o\'zaro o\'yinda yutgan jamoa noto\'g\'ri eliminatsiya qilinmaydi',
+    anE['Curaçao'].eliminated === false || anE['Ecuador'].eliminated === false);
+
   check('renderGroups eliminatsiya bilan xatosiz', (() => {
     try { sandbox.renderGroups(); return /class="[^"]*elim/.test(sandbox.document.getElementById('ggrid').innerHTML); }
     catch (e) { return false; }

@@ -1096,9 +1096,12 @@ function thirdPlaceRanking() {
 // Qolgan o'yinlarning BARCHA natija variantlari (3^n) sanab chiqiladi.
 //  eliminated = hech bir holatda top-3 ga kira olmaydi (1/8 finalga yo'l yo'q)
 //  clinched   = har qanday holatda ham top-2 (chiqishni kafolatladi)
-// Faqat ochkolar bo'yicha (teng ochkoda — foyda jamoa tomonida, ya'ni
-// hech qachon noto'g'ri eliminatsiya bermaydi). Guruh tugagan bo'lsa —
-// haqiqiy yakuniy jadval ishlatiladi.
+// Ochko teng kelganda O'ZARO O'YIN ochkosi ham hisobga olinadi (FIFA 2026 da
+// bu gol farqidan oldin va natija hisobiga bog'liq emas). Shu sabab, masalan,
+// 3 ochkoga yetadigan jamoa o'zaro o'yinda yutqazgan raqibidan past turishi
+// aniq bo'lsa — eliminatsiya deb belgilanadi. Chuqurroq (gol farqi) tay-breklar
+// jamoa foydasiga olinadi, ya'ni hech qachon noto'g'ri eliminatsiya bermaydi.
+// Guruh tugagan bo'lsa — haqiqiy yakuniy jadval ishlatiladi.
 function analyzeGroup(group) {
   var teams = GROUPS[group];
   var res = {};
@@ -1108,7 +1111,7 @@ function analyzeGroup(group) {
   var remaining = FIXTURES.filter(function(f) { return f.group === group && f.homeScore === null; });
   if (played.length === 0) return res; // hali hech narsa hal bo'lmagan
 
-  // Guruh tugagan: yakuniy o'rinlarga qarab (GD tay-brek allaqachon hal bo'lgan)
+  // Guruh tugagan: yakuniy o'rinlarga qarab (tay-brek allaqachon hal bo'lgan)
   if (remaining.length === 0) {
     standings(group).forEach(function(t, i) {
       res[t.name].eliminated = (i === 3); // 4-o'rin
@@ -1117,42 +1120,57 @@ function analyzeGroup(group) {
     return res;
   }
 
-  var basePts = {};
-  teams.forEach(function(n) { basePts[n] = 0; });
-  played.forEach(function(f) {
-    if (f.homeScore > f.awayScore) basePts[f.home] += 3;
-    else if (f.homeScore < f.awayScore) basePts[f.away] += 3;
-    else { basePts[f.home]++; basePts[f.away]++; }
+  // O'ynalgan o'yinlar: faqat natija (uy/durang/mehmon) kerak
+  var baseGames = played.map(function(f) {
+    return { home: f.home, away: f.away,
+      r: f.homeScore > f.awayScore ? 'H' : (f.homeScore < f.awayScore ? 'A' : 'D') };
   });
+  var rem = remaining.map(function(f) { return { home: f.home, away: f.away }; });
 
-  // Boshlanishda hammasini "imkoni yo'q" va "kafolatlangan" deb olamiz,
-  // bitta variant aksini ko'rsatsa — bekor qilamiz
   teams.forEach(function(n) { res[n].eliminated = true; res[n].clinched = true; });
 
-  var r = remaining.length;
+  var r = rem.length;
   var total = Math.pow(3, r);
   for (var c = 0; c < total; c++) {
-    var pts = {};
-    teams.forEach(function(n) { pts[n] = basePts[n]; });
+    var games = baseGames.slice();
     var x = c;
     for (var i = 0; i < r; i++) {
       var o = x % 3; x = Math.floor(x / 3);
-      var g = remaining[i];
-      if (o === 0) pts[g.home] += 3;
-      else if (o === 1) pts[g.away] += 3;
-      else { pts[g.home]++; pts[g.away]++; }
+      games.push({ home: rem[i].home, away: rem[i].away, r: o === 0 ? 'H' : (o === 1 ? 'A' : 'D') });
     }
+    // Umumiy ochko
+    var pts = {};
+    teams.forEach(function(n) { pts[n] = 0; });
+    games.forEach(function(g) {
+      if (g.r === 'H') pts[g.home] += 3;
+      else if (g.r === 'A') pts[g.away] += 3;
+      else { pts[g.home]++; pts[g.away]++; }
+    });
+    // Teng ochkoli jamoalar orasidagi o'zaro o'yin ochkosi
+    var h2hp = {};
     teams.forEach(function(n) {
-      var more = 0, fewer = 0;
+      h2hp[n] = 0;
+      var grp = teams.filter(function(m) { return pts[m] === pts[n]; });
+      if (grp.length > 1 && grp.length < 4) {
+        games.forEach(function(g) {
+          if (grp.indexOf(g.home) < 0 || grp.indexOf(g.away) < 0) return;
+          if (g.home === n) { if (g.r === 'H') h2hp[n] += 3; else if (g.r === 'D') h2hp[n] += 1; }
+          else if (g.away === n) { if (g.r === 'A') h2hp[n] += 3; else if (g.r === 'D') h2hp[n] += 1; }
+        });
+      }
+    });
+    // "m qat'iy yuqori": ko'proq ochko, yoki teng ochkoda ko'proq o'zaro ochko
+    teams.forEach(function(n) {
+      var above = 0, below = 0;
       teams.forEach(function(m) {
         if (m === n) return;
-        if (pts[m] > pts[n]) more++;
-        else if (pts[m] < pts[n]) fewer++;
+        var mAbove = pts[m] > pts[n] || (pts[m] === pts[n] && h2hp[m] > h2hp[n]);
+        var mBelow = pts[m] < pts[n] || (pts[m] === pts[n] && h2hp[m] < h2hp[n]);
+        if (mAbove) above++;
+        if (mBelow) below++;
       });
-      // top-3 mumkin (3-dan ko'p bo'lmagan jamoa qat'iy yuqori) → eliminatsiya emas
-      if (more <= 2) res[n].eliminated = false;
-      // kamida 2 jamoa qat'iy past bo'lmasa — top-2 kafolatlanmagan
-      if (fewer < 2) res[n].clinched = false;
+      if (above <= 2) res[n].eliminated = false; // top-3 hali mumkin
+      if (below < 2) res[n].clinched = false;    // top-2 kafolatlanmagan
     });
   }
   return res;
