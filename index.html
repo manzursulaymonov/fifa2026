@@ -153,6 +153,55 @@ main { position: relative; z-index: 1; max-width: 1440px; margin: 0 auto; paddin
 .p3 { background: var(--p3bg); color: var(--lime2); }
 .p4 { background: var(--p4bg); color: var(--muted); }
 .pts { font-weight: 700; color: var(--text) !important; }
+/* Guruh jadvalida o'rin chizig'i: 2 va 3 orasi (chiqish chegarasi) */
+.gtbl tr.qual td { box-shadow: inset 3px 0 0 var(--lime2); }
+.gtbl tr.qual3 td { box-shadow: inset 3px 0 0 var(--gold2); }
+.gtbl tr.cutline td { border-bottom: 2px solid var(--goldbrd2); }
+.legend { display: flex; flex-wrap: wrap; gap: .4rem 1.1rem; margin-bottom: 1.1rem; font-size: .72rem; color: var(--muted); }
+.lg { display: flex; align-items: center; gap: .4rem; }
+.lgdot { width: 11px; height: 11px; border-radius: 3px; display: inline-block; flex-shrink: 0; }
+.lg-q12 { background: var(--lime2); }
+.lg-q3 { background: var(--gold2); }
+.lg-out { background: var(--muted); }
+
+/* THIRD-PLACE TABLE */
+.t3card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; overflow-x: auto; box-shadow: var(--shadow); }
+.t3tbl { width: 100%; border-collapse: collapse; min-width: 560px; }
+.t3tbl th { font-size: .58rem; text-transform: uppercase; letter-spacing: .07em; color: var(--muted); padding: .55rem .6rem; text-align: center; border-bottom: 1px solid var(--border2); font-family: 'DM Mono'; }
+.t3tbl th.l, .t3tbl td.l { text-align: left; }
+.t3tbl td { padding: .55rem .6rem; font-size: .82rem; text-align: center; border-bottom: 1px solid var(--rowline); font-family: 'DM Mono'; }
+.t3tbl td.team { font-family: 'DM Sans'; font-weight: 500; }
+.t3tbl tr:last-child td { border-bottom: none; }
+.t3tbl tr.q { background: var(--okbg); }
+.t3tbl tr.q .t3rank { color: var(--lime2); }
+.t3tbl tr.cut td { border-bottom: 2px dashed var(--goldbrd2); }
+.t3rank { font-family: 'Bebas Neue'; font-size: 1.05rem; color: var(--muted); }
+.t3team { display: inline-flex; align-items: center; gap: .45rem; }
+.t3stat { font-size: .62rem; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; padding: .12rem .45rem; border-radius: 3px; }
+.t3-q { background: var(--okbg); color: var(--lime2); }
+.t3-out { background: var(--livebg); color: var(--red); }
+.t3-prov { color: var(--gold2); font-size: .6rem; }
+
+/* RULES PAGE */
+.rules { max-width: 900px; }
+.rblock { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 1.1rem 1.35rem; margin-bottom: 1.1rem; box-shadow: var(--shadow); }
+.rblock h3 { font-family: 'Bebas Neue'; font-size: 1.15rem; letter-spacing: .06em; color: var(--gold); margin-bottom: .7rem; display: flex; align-items: center; gap: .5rem; }
+.rblock p { font-size: .86rem; line-height: 1.6; color: var(--text2); margin-bottom: .6rem; }
+.rblock p:last-child { margin-bottom: 0; }
+.rblock strong { color: var(--text); }
+.rlist { list-style: none; counter-reset: r; }
+.rlist li { font-size: .85rem; line-height: 1.5; color: var(--text2); padding: .4rem 0 .4rem 2.2rem; position: relative; border-bottom: 1px solid var(--border2); counter-increment: r; }
+.rlist li:last-child { border-bottom: none; }
+.rlist li::before { content: counter(r); position: absolute; left: 0; top: .42rem; width: 1.5rem; height: 1.5rem; background: var(--goldbg); color: var(--gold); border: 1px solid var(--goldbrd); border-radius: 6px; font-family: 'DM Mono'; font-size: .72rem; font-weight: 600; display: flex; align-items: center; justify-content: center; }
+.rlist li b { color: var(--text); }
+.ksched { display: grid; grid-template-columns: 1fr auto auto; gap: .15rem .9rem; font-size: .82rem; }
+.ksched .kr { display: contents; }
+.ksched .kr > div { padding: .42rem .2rem; border-bottom: 1px solid var(--border2); }
+.ksched .kstage { font-weight: 600; color: var(--text); }
+.ksched .kdate { color: var(--gold2); font-family: 'DM Mono'; font-size: .76rem; text-align: right; white-space: nowrap; }
+.ksched .kn { color: var(--muted); font-family: 'DM Mono'; font-size: .72rem; text-align: right; }
+.rnote { font-size: .76rem; color: var(--muted); margin-top: .5rem; }
+.bracket-slot { display: inline-block; background: var(--chipbg); border-radius: 4px; padding: .05rem .35rem; font-family: 'DM Mono'; font-size: .74rem; color: var(--text2); margin: .1rem .15rem .1rem 0; }
 
 /* FILTER */
 .fbar { display: flex; gap: .35rem; margin-bottom: 1.1rem; flex-wrap: wrap; }
@@ -238,8 +287,10 @@ main { position: relative; z-index: 1; max-width: 1440px; margin: 0 auto; paddin
   <nav aria-label="Sahifalar">
     <button class="act" data-page="overview" onclick="showPage('overview',this)">Umumiy</button>
     <button data-page="groups" onclick="showPage('groups',this)">Guruhlar</button>
+    <button data-page="thirdplace" onclick="showPage('thirdplace',this)">3-O'rin</button>
     <button data-page="matches" onclick="showPage('matches',this)">O'yinlar</button>
     <button data-page="scorers" onclick="showPage('scorers',this)">To'purarlar</button>
+    <button data-page="rules" onclick="showPage('rules',this)">Qoidalar</button>
   </nav>
   <div class="hright">
     <div class="apipill">
@@ -273,7 +324,28 @@ main { position: relative; z-index: 1; max-width: 1440px; margin: 0 auto; paddin
 
   <div id="page-groups" class="page">
     <div class="sec">Guruh Jadvallari</div>
+    <div class="legend">
+      <span class="lg"><span class="lgdot lg-q12"></span>1-2 o'rin — 1/16 finalga chiqadi</span>
+      <span class="lg"><span class="lgdot lg-q3"></span>3-o'rin — eng yaxshi 8 tasi chiqadi</span>
+      <span class="lg"><span class="lgdot lg-out"></span>4-o'rin — tushadi</span>
+    </div>
     <div class="ggrid" id="ggrid"></div>
+  </div>
+
+  <div id="page-thirdplace" class="page">
+    <div class="sec">Eng Yaxshi 3-O'rinlar</div>
+    <div class="note">
+      🥉 Har guruhda <strong>1 va 2-o'rin</strong> egasi to'g'ridan-to'g'ri 1/16 finalga chiqadi.
+      12 ta guruhdagi <strong>3-o'rin</strong> jamoalari quyida umumiy ko'rsatkichlar bo'yicha
+      taqqoslanadi va <strong>eng yaxshi 8 tasi</strong> ham keyingi bosqichga o'tadi.
+      Tartib: ochko → gol farqi → urilgan gol. Barcha guruhlar tugaguncha jadval <em>shartli</em>.
+    </div>
+    <div id="third-list"></div>
+  </div>
+
+  <div id="page-rules" class="page">
+    <div class="sec">Turnir Qoidalari va Tartibi</div>
+    <div id="rules-body"></div>
   </div>
 
   <div id="page-matches" class="page">
@@ -833,8 +905,10 @@ function loadAll() {
       buildScorerTotals();
       renderAll();
       if (curPage === 'groups') renderGroups();
+      if (curPage === 'thirdplace') renderThird();
       if (curPage === 'matches') renderMatches();
       if (curPage === 'scorers') renderScorers();
+      if (curPage === 'rules') renderBracket();
       loadAllScorers();
       apiLoading = false;
     });
@@ -938,6 +1012,45 @@ function liveMinute(f) {
   return f.minute || '';
 }
 
+// Faqat berilgan jamoalar o'rtasidagi o'yinlardan mini-jadval (h2h)
+// FIFA 2026: ochkolar tengligida bu birinchi mezon (yangi qoida)
+function h2hMini(names) {
+  var t = {};
+  names.forEach(function(n) { t[n] = { pts: 0, gd: 0, gf: 0 }; });
+  FIXTURES.forEach(function(f) {
+    if (f.homeScore === null) return;
+    if (names.indexOf(f.home) < 0 || names.indexOf(f.away) < 0) return;
+    var h = t[f.home], a = t[f.away];
+    h.gf += f.homeScore; h.gd += f.homeScore - f.awayScore;
+    a.gf += f.awayScore; a.gd += f.awayScore - f.homeScore;
+    if (f.homeScore > f.awayScore) h.pts += 3;
+    else if (f.homeScore < f.awayScore) a.pts += 3;
+    else { h.pts++; a.pts++; }
+  });
+  return t;
+}
+
+// FIFA 2026 guruh tartibi mezonlari (Modda 13):
+//  1) ochkolar  2) o'zaro o'yin ochkolari  3) o'zaro gol farqi
+//  4) o'zaro urilgan gollar  5) umumiy gol farqi  6) umumiy urilgan gol
+//  (keyin fair-play va FIFA reytingi — bu yerda hisoblanmaydi)
+function sortGroupTeams(arr) {
+  return arr.slice().sort(function(a, b) {
+    if (b.pts !== a.pts) return b.pts - a.pts;
+    var tied = arr.filter(function(x) { return x.pts === a.pts; });
+    if (tied.length > 1 && tied.length < arr.length) {
+      var mini = h2hMini(tied.map(function(x) { return x.name; }));
+      var ma = mini[a.name], mb = mini[b.name];
+      if (mb.pts !== ma.pts) return mb.pts - ma.pts;
+      if (mb.gd !== ma.gd) return mb.gd - ma.gd;
+      if (mb.gf !== ma.gf) return mb.gf - ma.gf;
+    }
+    if (b.gd !== a.gd) return b.gd - a.gd;
+    if (b.gf !== a.gf) return b.gf - a.gf;
+    return a.name.localeCompare(b.name);
+  });
+}
+
 function standings(group) {
   var t = {};
   GROUPS[group].forEach(function(n) { t[n] = {name:n,p:0,w:0,d:0,l:0,gf:0,ga:0,pts:0}; });
@@ -949,8 +1062,27 @@ function standings(group) {
     else if (f.homeScore < f.awayScore) { a.w++; a.pts += 3; h.l++; }
     else { h.d++; a.d++; h.pts++; a.pts++; }
   });
-  return Object.values(t).map(function(x) { return Object.assign({}, x, {gd: x.gf - x.ga}); })
-    .sort(function(a,b) { return b.pts-a.pts || b.gd-a.gd || b.gf-a.gf; });
+  var arr = Object.values(t).map(function(x) { return Object.assign({}, x, {gd: x.gf - x.ga}); });
+  return sortGroupTeams(arr);
+}
+
+function groupPlayed(group) {
+  return FIXTURES.filter(function(f) { return f.group === group && f.homeScore !== null; }).length;
+}
+
+// 12 ta 3-o'rin jamoasini umumiy ko'rsatkichlar bo'yicha tartiblash.
+// O'zaro o'yin yo'q (har xil guruh), shuning uchun h2h qo'llanmaydi:
+//  ochkolar → gol farqi → urilgan gol → (fair-play / FIFA reytingi)
+// Eng yaxshi 8 tasi 1/8 finalga chiqadi.
+function thirdPlaceRanking() {
+  var arr = Object.keys(GROUPS).map(function(g) {
+    var third = standings(g)[2];
+    return Object.assign({}, third, { group: g, groupDone: groupPlayed(g) === 6 });
+  });
+  arr.sort(function(a, b) {
+    return b.pts - a.pts || b.gd - a.gd || b.gf - a.gf || a.group.localeCompare(b.group);
+  });
+  return arr;
 }
 
 // ═══════════════════════════════════════════════════
@@ -1032,7 +1164,8 @@ function renderGroups() {
     var played = FIXTURES.filter(function(f) { return f.group === g && f.homeScore !== null; }).length;
     var rows = st.map(function(t, i) {
       var pc = ['p1','p2','p3','p4'][Math.min(i,3)];
-      return '<tr>'
+      var rc = i < 2 ? ' class="qual' + (i === 1 ? ' cutline' : '') + '"' : (i === 2 ? ' class="qual3"' : '');
+      return '<tr' + rc + '>'
         + '<td><div class="trow">'
         +   '<span class="pb ' + pc + '">' + (i+1) + '</span>'
         +   flagImg(t.name, 18)
@@ -1100,6 +1233,155 @@ function renderScorers() {
       + '<div class="sgoals">' + s.goals + '<span>gol</span></div>'
       + '</div>';
   }).join('');
+}
+
+function renderThird() {
+  var arr = thirdPlaceRanking();
+  var anyPlayed = FIXTURES.some(function(f) { return f.homeScore !== null; });
+  var allDone = Object.keys(GROUPS).every(function(g) { return groupPlayed(g) === 6; });
+  if (!anyPlayed) {
+    document.getElementById('third-list').innerHTML =
+      '<div class="empty"><div class="eic">🥉</div>Guruh o\'yinlari boshlanishi bilan 3-o\'rinlar jadvali ko\'rinadi</div>';
+    return;
+  }
+  var rows = arr.map(function(t, i) {
+    var q = i < 8;
+    var verb = allDone ? (q ? 'Chiqdi' : 'Tushdi') : (q ? 'Chiqadi' : 'Tushadi');
+    var badge = '<span class="t3stat ' + (q ? 't3-q' : 't3-out') + '">' + verb + '</span>';
+    return '<tr class="' + (q ? 'q' : '') + (i === 7 ? ' cut' : '') + '">'
+      + '<td class="t3rank">' + (i + 1) + '</td>'
+      + '<td class="l team"><span class="t3team">' + flagImg(t.name, 20)
+        + '<span>' + esc(t.name) + '</span>'
+        + (t.groupDone ? '' : ' <span class="t3-prov" title="Guruh hali tugamagan">●</span>')
+        + '</span></td>'
+      + '<td>' + t.group + '</td>'
+      + '<td>' + t.p + '</td><td>' + t.w + '</td><td>' + t.d + '</td><td>' + t.l + '</td>'
+      + '<td>' + t.gf + ':' + t.ga + '</td>'
+      + '<td>' + (t.gd > 0 ? '+' : '') + t.gd + '</td>'
+      + '<td class="pts">' + t.pts + '</td>'
+      + '<td>' + badge + '</td>'
+      + '</tr>';
+  }).join('');
+  document.getElementById('third-list').innerHTML =
+    '<div class="t3card"><table class="t3tbl"><thead><tr>'
+    + '<th>#</th><th class="l">Jamoa</th><th>Gr</th><th>O</th><th>G</th><th>D</th><th>M</th><th>G:Y</th><th>±</th><th>O\'</th><th>Holat</th>'
+    + '</tr></thead><tbody>' + rows + '</tbody></table></div>'
+    + '<div class="rnote">Yashil — eng yaxshi 8 ta (1/16 finalga chiqadi). ● — guruh hali tugamagan, '
+    + 'ko\'rsatkichlar o\'zgarishi mumkin. Teng holatda FIFA fair-play va jahon reytingi mezonlari qo\'llanadi.</div>';
+}
+
+// 1/16 final to'rlari (FIFA rasmiy jadvali, M73–M88).
+// 'home'/'away': "1A"=guruh A g'olibi, "2B"=guruh B 2-o'rin, "3"=eng yaxshi 3-o'rin (pool — manba guruhlar)
+var R32 = [
+  { m: 73, date: '28 iyun', home: '2A', away: '2B', pool: null },
+  { m: 74, date: '29 iyun', home: '1E', away: '3', pool: 'A/B/C/D/F' },
+  { m: 75, date: '29 iyun', home: '1F', away: '2C', pool: null },
+  { m: 76, date: '29 iyun', home: '1C', away: '2F', pool: null },
+  { m: 77, date: '30 iyun', home: '1I', away: '3', pool: 'C/D/F/G/H' },
+  { m: 78, date: '30 iyun', home: '2E', away: '2I', pool: null },
+  { m: 79, date: '30 iyun', home: '1A', away: '3', pool: 'C/E/F/H/I' },
+  { m: 80, date: '30 iyun', home: '1L', away: '3', pool: 'E/H/I/J/K' },
+  { m: 81, date: '1 iyul', home: '1D', away: '3', pool: 'B/E/F/I/J' },
+  { m: 82, date: '1 iyul', home: '1G', away: '3', pool: 'A/E/H/I/J' },
+  { m: 83, date: '1 iyul', home: '2K', away: '2L', pool: null },
+  { m: 84, date: '1 iyul', home: '1H', away: '2J', pool: null },
+  { m: 85, date: '2 iyul', home: '1B', away: '3', pool: 'E/F/G/I/J' },
+  { m: 86, date: '2 iyul', home: '1J', away: '2H', pool: null },
+  { m: 87, date: '2 iyul', home: '1K', away: '3', pool: 'D/E/I/J/L' },
+  { m: 88, date: '2 iyul', home: '2D', away: '2G', pool: null }
+];
+
+// "1A"/"2B" kabi slotni jamoa nomiga aylantiradi (guruh tugagan bo'lsa)
+function slotTeam(code) {
+  var pos = code.charAt(0), g = code.charAt(1);
+  if (groupPlayed(g) === 6) {
+    var st = standings(g);
+    var t = pos === '1' ? st[0] : st[1];
+    if (t) return flagImg(t.name, 16) + ' ' + esc(t.name);
+  }
+  return '<span class="bracket-slot">Guruh ' + g + (pos === '1' ? ' g\'olibi' : ' 2-o\'rin') + '</span>';
+}
+
+function renderBracket() {
+  var el = document.getElementById('r32-list');
+  if (!el) return;
+  el.innerHTML = R32.map(function(x) {
+    var away = x.away === '3'
+      ? '<span class="bracket-slot">3-o\'rin (' + x.pool + ')</span>'
+      : slotTeam(x.away);
+    return '<div class="kr">'
+      + '<div class="kstage">' + slotTeam(x.home) + ' <span style="color:var(--muted)">—</span> ' + away + '</div>'
+      + '<div class="kdate">' + x.date + '</div>'
+      + '<div class="kn">M' + x.m + '</div>'
+      + '</div>';
+  }).join('');
+}
+
+function renderRules() {
+  var groupTb = [
+    "Guruh o'yinlarida to'plangan <b>ochkolar</b> (g'alaba 3, durrang 1)",
+    "Teng kelsa — faqat <b>o'zaro o'yinlardagi ochkolar</b> <em>(2026-yildan yangi: bevosita taqqoslash birinchi o'rinda)</em>",
+    "O'zaro o'yinlardagi <b>gol farqi</b>",
+    "O'zaro o'yinlarda <b>urilgan gollar</b>",
+    "Umumiy <b>gol farqi</b>",
+    "Umumiy <b>urilgan gollar</b>",
+    "<b>Fair-play</b> bahosi (sariq/qizil kartochkalar kamroq bo'lgani yuqori)",
+    "FIFA <b>jahon reytingi</b>"
+  ];
+  var thirdTb = [
+    "Barcha guruh o'yinlarida <b>ochkolar</b>",
+    "Umumiy <b>gol farqi</b>",
+    "Umumiy <b>urilgan gollar</b>",
+    "<b>Fair-play</b> bahosi",
+    "FIFA <b>jahon reytingi</b>"
+  ];
+  var sched = [
+    ['Guruh bosqichi', '11–27 iyun', '72 o\'yin'],
+    ['1/16 final (Round of 32)', '28 iyun – 3 iyul', 'M73–M88'],
+    ['1/8 final (Round of 16)', '4–7 iyul', 'M89–M96'],
+    ['1/4 final', '9–11 iyul', 'M97–M100'],
+    ['Yarim final', '14–15 iyul', 'M101–M102'],
+    ['3-o\'rin uchun o\'yin', '18 iyul', 'M103'],
+    ['FINAL', '19 iyul', 'M104']
+  ];
+  document.getElementById('rules-body').innerHTML =
+    '<div class="rules">'
+    + '<div class="rblock"><h3>🌍 Format</h3>'
+      + '<p><strong>48 ta jamoa</strong> 12 ta guruhga (A–L) bo\'linadi, har guruhda 4 jamoa. '
+      + 'Har bir jamoa guruhdagi qolgan 3 jamoa bilan bir martadan o\'ynaydi (aylanma tizim). '
+      + 'Jami <strong>72 ta guruh o\'yini</strong>. Turnir AQSh, Kanada va Meksikada o\'tadi.</p></div>'
+
+    + '<div class="rblock"><h3>✅ Keyingi bosqichga chiqish</h3>'
+      + '<p>Har guruhdan <strong>1 va 2-o\'rin</strong> egasi to\'g\'ridan-to\'g\'ri 1/16 finalga chiqadi — '
+      + 'jami <strong>24 ta jamoa</strong>.</p>'
+      + '<p>Bundan tashqari, 12 ta guruhdagi <strong>3-o\'rin</strong> jamoalari o\'zaro taqqoslanib, '
+      + '<strong>eng yaxshi 8 tasi</strong> ham chiqadi. Natijada 1/16 finalda jami '
+      + '<strong>24 + 8 = 32 ta jamoa</strong> qatnashadi.</p>'
+      + '<p>Qolgan 4 ta 3-o\'rin va barcha 4-o\'rin jamoalari turnirni tark etadi.</p></div>'
+
+    + '<div class="rblock"><h3>📋 Guruhda o\'rin belgilash tartibi</h3>'
+      + '<p>Ikki yoki undan ortiq jamoa teng ochko to\'plasa, quyidagi mezonlar ketma-ket qo\'llanadi:</p>'
+      + '<ol class="rlist">' + groupTb.map(function(x) { return '<li>' + x + '</li>'; }).join('') + '</ol></div>'
+
+    + '<div class="rblock"><h3>🥉 Eng yaxshi 3-o\'rinlarni saralash</h3>'
+      + '<p>12 ta 3-o\'rin jamoasi bir-biri bilan o\'ynamagani uchun o\'zaro taqqoslash yo\'q — '
+      + 'faqat umumiy ko\'rsatkichlar bo\'yicha tartiblanadi:</p>'
+      + '<ol class="rlist">' + thirdTb.map(function(x) { return '<li>' + x + '</li>'; }).join('') + '</ol></div>'
+
+    + '<div class="rblock"><h3>🏆 Pley-off va sanalar</h3>'
+      + '<div class="ksched">' + sched.map(function(r) {
+          return '<div class="kr"><div class="kstage">' + esc(r[0]) + '</div>'
+            + '<div class="kdate">' + esc(r[1]) + '</div><div class="kn">' + esc(r[2]) + '</div></div>';
+        }).join('') + '</div>'
+      + '<p class="rnote">Pley-off chiqaruv tizimida: 1/16 → 1/8 → 1/4 → yarim final → final. '
+      + 'Final 19-iyul kuni MetLife Stadium (Nyu-York/Nyu-Jersi)da o\'ynaladi.</p></div>'
+
+    + '<div class="rblock" id="r32-bracket"><h3>🔀 1/16 final to\'rlari (M73–M88)</h3>'
+      + '<p>Guruh tugagach g\'olib va 2-o\'rin avtomatik to\'ldiriladi. 3-o\'rin jamosi qaysi guruhdan '
+      + 'kelishi — qaysi 8 ta guruhdan 3-o\'rinlar chiqqaniga bog\'liq (FIFA Annex C, 495 variant).</p>'
+      + '<div class="ksched" id="r32-list"></div></div>'
+    + '</div>';
+  renderBracket();
 }
 
 // ═══════════════════════════════════════════════════
@@ -1208,8 +1490,10 @@ function showPage(page, btn) {
   if (btn) btn.classList.add('act');
   curPage = page;
   if (page === 'groups') renderGroups();
+  if (page === 'thirdplace') renderThird();
   if (page === 'matches') renderMatches();
   if (page === 'scorers') renderScorers();
+  if (page === 'rules') renderRules();
   // URL hash — sahifani ulashish va "orqaga" tugmasi uchun
   try { if (location.hash !== '#' + page) location.hash = page; } catch (e) {}
 }

@@ -359,6 +359,89 @@ check('shortName boshqa nomlarni o\'zgartirmaydi', sandbox.shortName('Uzbekistan
   check('tugagach daqiqa ko\'rsatilmaydi', sandbox.liveMinute(fG) === '' && fG.minute === null);
   check('kutilayotgan o\'yinda daqiqa yo\'q', sandbox.liveMinute({ status: 'NS', minute: "10'" }) === '');
 
+  // Bu yerdan keyin toza holatdan boshlaymiz
+  FIXTURES.forEach(f => {
+    f.homeScore = null; f.awayScore = null; f.status = 'NS';
+    f.homeScorers = []; f.awayScorers = []; f.goalsSource = null; f.scoreSource = null;
+  });
+  function setScore(home, away, hs, as) {
+    const f = FIXTURES.find(x => x.home === home && x.away === away);
+    if (!f) throw new Error('fixture topilmadi: ' + home + ' vs ' + away);
+    f.homeScore = hs; f.awayScore = as; f.status = 'FT';
+  }
+
+  console.log('\n[20] 2026 tartib mezoni: o\'zaro o\'yin (head-to-head) GD dan oldin');
+  // Guruh A: Czechia 1-o'rin; Mexico va South Africa 3 ochkoda teng.
+  // Mexico SA ni yenggan (h2h), ammo SA ning umumiy GD si ancha yaxshi.
+  // 2026 qoidasi bo'yicha Mexico (h2h g'olibi) yuqori turishi shart.
+  setScore('Mexico', 'South Africa', 1, 0);   // A>B (h2h)
+  setScore('South Korea', 'Czechia', 0, 0);   // C-D durrang
+  setScore('Czechia', 'South Africa', 1, 0);  // D>B
+  setScore('Mexico', 'South Korea', 0, 1);    // C>A
+  setScore('Czechia', 'Mexico', 1, 0);        // D>A
+  setScore('South Africa', 'South Korea', 5, 0); // B>C katta hisobda
+  const stA = sandbox.standings('A');
+  const mx = stA.find(t => t.name === 'Mexico');
+  const sa = stA.find(t => t.name === 'South Africa');
+  check('Mexico va South Africa teng ochkoda (3)', mx.pts === 3 && sa.pts === 3);
+  check('South Africa umumiy GD yaxshiroq (+3 vs -1)', sa.gd === 3 && mx.gd === -1);
+  check('Czechia 1-o\'rin', stA[0].name === 'Czechia');
+  check('h2h g\'olibi Mexico 3-o\'rinda (GD yomon bo\'lsa ham)', stA[2].name === 'Mexico');
+  check('h2h mag\'lubi South Africa 4-o\'rinda (GD yaxshi bo\'lsa ham)', stA[3].name === 'South Africa');
+
+  console.log('\n[21] 3-o\'rinlar reytingi');
+  // Guruh B ni to'liq o'rnatamiz: 3-o'rin egasi 4 ochko (A guruh 3-o'rnidan baland)
+  setScore('Canada', 'Bosnia and Herzegovina', 0, 0);
+  setScore('Qatar', 'Switzerland', 0, 0);
+  setScore('Switzerland', 'Bosnia and Herzegovina', 3, 0);
+  setScore('Canada', 'Qatar', 3, 0);
+  setScore('Switzerland', 'Canada', 0, 0);
+  setScore('Bosnia and Herzegovina', 'Qatar', 2, 0);
+  const third = sandbox.thirdPlaceRanking();
+  check('12 ta 3-o\'rin jamoasi', third.length === 12);
+  check('har biri unikal guruhdan', new Set(third.map(t => t.group)).size === 12);
+  check('pts→gd→gf bo\'yicha kamayib boradi', third.every((t, i) =>
+    i === 0 || third[i-1].pts > t.pts ||
+    (third[i-1].pts === t.pts && (third[i-1].gd > t.gd ||
+      (third[i-1].gd === t.gd && third[i-1].gf >= t.gf)))));
+  const aThird = third.find(t => t.group === 'A');
+  const bThird = third.find(t => t.group === 'B');
+  check('A guruh 3-o\'rni = Mexico', aThird.name === 'Mexico');
+  check('ko\'p ochkoli 3-o\'rin yuqorida', third.indexOf(bThird) < third.indexOf(aThird));
+  check('to\'liq guruh groupDone=true', aThird.groupDone === true);
+  check('o\'ynalmagan guruh groupDone=false', third.find(t => t.group === 'L').groupDone === false);
+
+  console.log('\n[22] 1/16 final to\'rlari (R32) ma\'lumotlari');
+  const R32 = sandbox.R32;
+  check('16 ta o\'yin', R32.length === 16);
+  check('match raqamlari 73–88 unikal', new Set(R32.map(x => x.m)).size === 16
+    && Math.min(...R32.map(x => x.m)) === 73 && Math.max(...R32.map(x => x.m)) === 88);
+  const thirdSlots = R32.filter(x => x.away === '3');
+  check('aynan 8 ta 3-o\'rin sloti', thirdSlots.length === 8);
+  check('har bir 3-o\'rin slotida 5 ta guruhli pool', thirdSlots.every(x => /^([A-L]\/){4}[A-L]$/.test(x.pool)));
+  check('boshqa slotlar 1X/2X formatida', R32.filter(x => x.away !== '3')
+    .every(x => /^[12][A-L]$/.test(x.home) && /^[12][A-L]$/.test(x.away)));
+  check('slotTeam tugagan guruhni jamoaga aylantiradi', /Czechia/.test(sandbox.slotTeam('1A')));
+  check('slotTeam tugamagan guruhda placeholder', /g'olibi/.test(sandbox.slotTeam('1L')));
+
+  console.log('\n[23] Yangi sahifalar va render');
+  check('navda 3-O\'rin tugmasi', /data-page="thirdplace"/.test(html));
+  check('navda Qoidalar tugmasi', /data-page="rules"/.test(html));
+  check('page-thirdplace mavjud', /id="page-thirdplace"/.test(html));
+  check('page-rules mavjud', /id="page-rules"/.test(html));
+  let renderErr = null;
+  try {
+    sandbox.renderThird();
+    sandbox.renderRules();
+    sandbox.renderBracket();
+  } catch (e) { renderErr = e; }
+  check('renderThird/Rules/Bracket xatosiz', !renderErr, renderErr && renderErr.message);
+  const t3 = sandbox.document.getElementById('third-list').innerHTML;
+  check('3-o\'rin jadvalida "Chiq" holati bor', /Chiq/.test(t3));
+  const rb = sandbox.document.getElementById('rules-body').innerHTML;
+  check('qoidalar sahifasida head-to-head izohi', /o'zaro o'yin/i.test(rb) || /bevosita taqqoslash/.test(rb));
+  check('qoidalarda 24 \\+ 8 = 32 tushuntirishi', /32 ta jamoa/.test(rb));
+
   console.log('\n──────────────────────────────');
   console.log(passed + ' o\'tdi, ' + failed + ' yiqildi');
   process.exit(failed ? 1 : 0);
