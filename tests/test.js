@@ -504,6 +504,64 @@ check('shortName boshqa nomlarni o\'zgartirmaydi', sandbox.shortName('Uzbekistan
     catch (e) { return false; }
   })());
 
+  console.log('\n[25] 3-o\'rin: matematik kafolat / imkonsizlik (thirdAdvanceStatus)');
+  function resetAll() {
+    FIXTURES.forEach(f => { f.homeScore = null; f.awayScore = null; f.status = 'NS'; f.scoreSource = null; });
+  }
+  // Guruhni "chiziqli" tugatadi: yuqori seed pastini yutadi → ochko 9,6,3,0; 3-o'rin = 3 ochko
+  function completeLinear(g) {
+    const T = GROUPS[g];
+    FIXTURES.filter(f => f.group === g).forEach(f => {
+      if (T.indexOf(f.home) < T.indexOf(f.away)) { f.homeScore = 1; f.awayScore = 0; }
+      else { f.homeScore = 0; f.awayScore = 1; }
+      f.status = 'FT';
+    });
+  }
+  check('completeLinear → 3-o\'rin oralig\'i {3,3}', (() => {
+    resetAll(); completeLinear('B');
+    const rng = sandbox.thirdPointsRange('B');
+    return rng.min === 3 && rng.max === 3;
+  })());
+  check('o\'ynalmagan guruh 3-o\'rin maksimumi 6', (() => {
+    resetAll();
+    return sandbox.thirdPointsRange('A').max === 6;
+  })());
+
+  // KAFOLAT: guruh A 3-o'rni 6 ochko (6-6-6-0 sikli), qolgan 11 guruh 3-o'rni 3 ochko.
+  resetAll();
+  // Guruh A: Czechia pastda (0), Mexico/SA/SKorea sikl (har biri 6)
+  setScore('Mexico', 'South Africa', 1, 0);
+  setScore('Mexico', 'South Korea', 0, 1);
+  setScore('Czechia', 'Mexico', 0, 1);
+  setScore('Czechia', 'South Africa', 0, 1);
+  setScore('South Africa', 'South Korea', 1, 0);
+  setScore('South Korea', 'Czechia', 1, 0);
+  ['B','C','D','E','F','G','H','I','J','K','L'].forEach(completeLinear);
+  const ts1 = sandbox.thirdAdvanceStatus();
+  check('A guruh 3-o\'rni (6 ochko) — chiqishi KAFOLATLANGAN', ts1.A === 'clinched');
+  check('3 ochkoli 3-o\'rinlar hali kafolatlanmagan', ts1.B === null && ts1.L === null);
+  check('hech bir 3-o\'rin noto\'g\'ri eliminatsiya emas',
+    Object.keys(ts1).every(g => ts1[g] !== 'eliminated'));
+
+  // IMKONSIZ: guruh A 3-o'rni 1 ochko, 8 ta boshqa guruh 3-o'rni 3 ochko (aniq yuqori).
+  resetAll();
+  // Guruh A: Mexico 9, SA 6, SKorea 1, Czechia 1 (SKorea-Czechia durang)
+  setScore('Mexico', 'South Africa', 1, 0);
+  setScore('Mexico', 'South Korea', 1, 0);
+  setScore('Czechia', 'Mexico', 0, 1);
+  setScore('Czechia', 'South Africa', 0, 1);
+  setScore('South Africa', 'South Korea', 1, 0);
+  setScore('South Korea', 'Czechia', 0, 0);
+  ['B','C','D','E','F','G','H','I'].forEach(completeLinear); // 8 ta guruh, 3-o'rin = 3
+  const ts2 = sandbox.thirdAdvanceStatus();
+  check('A guruh 3-o\'rni (1 ochko) — 8 talikka IMKONSIZ', ts2.A === 'eliminated');
+  check('3 ochkoli 3-o\'rin imkonsiz emas', ts2.B !== 'eliminated');
+  check('renderThird kafolat/imkonsiz bilan xatosiz', (() => {
+    try { sandbox.renderThird(); const h = sandbox.document.getElementById('third-list').innerHTML;
+      return /Kafolat|Imkonsiz/.test(h); }
+    catch (e) { return false; }
+  })());
+
   console.log('\n──────────────────────────────');
   console.log(passed + ' o\'tdi, ' + failed + ' yiqildi');
   process.exit(failed ? 1 : 0);

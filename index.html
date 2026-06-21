@@ -179,6 +179,7 @@ main { position: relative; z-index: 1; max-width: 1440px; margin: 0 auto; paddin
 .t3tbl tr:last-child td { border-bottom: none; }
 .t3tbl tr.q { background: var(--okbg); }
 .t3tbl tr.q .t3rank { color: var(--lime2); }
+.t3tbl tr.elim td { opacity: .5; }
 .t3tbl tr.cut td { border-bottom: 2px dashed var(--goldbrd2); }
 .t3rank { font-family: 'Bebas Neue'; font-size: 1.05rem; color: var(--muted); }
 .t3team { display: inline-flex; align-items: center; gap: .45rem; }
@@ -1176,7 +1177,65 @@ function analyzeGroup(group) {
   return res;
 }
 
-// ═══════════════════════════════════════════════════
+// Guruhda 3-o'rin egasi olishi mumkin bo'lgan ochko oralig'i (min..max),
+// qolgan o'yinlarning barcha variantlari bo'yicha. Faqat ochko (GD hisobga
+// olinmaydi — guruhlararo taqqoslashda xavfsiz, ehtiyotkor baho).
+function thirdPointsRange(group) {
+  var teams = GROUPS[group];
+  var played = FIXTURES.filter(function(f) { return f.group === group && f.homeScore !== null; });
+  var remaining = FIXTURES.filter(function(f) { return f.group === group && f.homeScore === null; });
+  var basePts = {};
+  teams.forEach(function(n) { basePts[n] = 0; });
+  played.forEach(function(f) {
+    if (f.homeScore > f.awayScore) basePts[f.home] += 3;
+    else if (f.homeScore < f.awayScore) basePts[f.away] += 3;
+    else { basePts[f.home]++; basePts[f.away]++; }
+  });
+  var rem = remaining.map(function(f) { return { home: f.home, away: f.away }; });
+  var r = rem.length, total = Math.pow(3, r), mn = Infinity, mx = -Infinity;
+  for (var c = 0; c < total; c++) {
+    var pts = {};
+    teams.forEach(function(n) { pts[n] = basePts[n]; });
+    var x = c;
+    for (var i = 0; i < r; i++) {
+      var o = x % 3; x = Math.floor(x / 3);
+      var g = rem[i];
+      if (o === 0) pts[g.home] += 3;
+      else if (o === 1) pts[g.away] += 3;
+      else { pts[g.home]++; pts[g.away]++; }
+    }
+    var arr = teams.map(function(n) { return pts[n]; }).sort(function(a, b) { return b - a; });
+    if (arr[2] < mn) mn = arr[2];
+    if (arr[2] > mx) mx = arr[2];
+  }
+  return { min: mn, max: mx };
+}
+
+// Tugagan guruhlardagi 3-o'rin jamoasi eng yaxshi 8 talikka kiradimi:
+//  'clinched'   = kafolatlangan (ko'pi bilan 7 ta boshqa 3-o'rin undan yuqori bo'la oladi)
+//  'eliminated' = imkonsiz (kamida 8 ta boshqa 3-o'rin aniq undan yuqori)
+//  null         = hali aniq emas (yoki guruh tugamagan)
+// Ehtiyotkor: teng ochko X foydasiga emas deb olinadi → noto'g'ri kafolat bermaydi.
+function thirdAdvanceStatus() {
+  var rng = {};
+  Object.keys(GROUPS).forEach(function(g) { rng[g] = thirdPointsRange(g); });
+  var res = {};
+  Object.keys(GROUPS).forEach(function(g) {
+    res[g] = null;
+    if (groupPlayed(g) !== 6) return; // faqat tugagan guruh uchun aniq xulosa
+    var P3 = standings(g)[2].pts;
+    var canBeAbove = 0, defAbove = 0;
+    Object.keys(GROUPS).forEach(function(h) {
+      if (h === g) return;
+      if (rng[h].max >= P3) canBeAbove++; // h ning 3-o'rni X dan yuqori/teng bo'la oladi
+      if (rng[h].min > P3) defAbove++;     // h ning 3-o'rni aniq X dan yuqori
+    });
+    if (canBeAbove <= 7) res[g] = 'clinched';
+    else if (defAbove >= 8) res[g] = 'eliminated';
+  });
+  return res;
+}
+
 // RENDER
 // ═══════════════════════════════════════════════════
 function renderAll() {
@@ -1250,13 +1309,17 @@ function renderOverviewLists() {
 }
 
 function renderGroups() {
+  var ts = thirdAdvanceStatus();
   document.getElementById('ggrid').innerHTML = Object.keys(GROUPS).map(function(g) {
     var st = standings(g);
     var played = FIXTURES.filter(function(f) { return f.group === g && f.homeScore !== null; }).length;
     var an = analyzeGroup(g);
     var rows = st.map(function(t, i) {
       var pc = ['p1','p2','p3','p4'][Math.min(i,3)];
-      var fate = an[t.name] || {};
+      var fate = Object.assign({}, an[t.name] || {});
+      // 3-o'rin egasi eng yaxshi 8 talik orqali kafolatlangan/imkonsiz bo'lishi mumkin
+      if (i === 2 && ts[g] === 'clinched') fate.clinched = true;
+      if (i === 2 && ts[g] === 'eliminated') fate.eliminated = true;
       var cls = [];
       if (i < 2) cls.push('qual');
       if (i === 1) cls.push('cutline');
@@ -1346,11 +1409,21 @@ function renderThird() {
       '<div class="empty"><div class="eic">🥉</div>Guruh o\'yinlari boshlanishi bilan 3-o\'rinlar jadvali ko\'rinadi</div>';
     return;
   }
+  var ts = thirdAdvanceStatus();
   var rows = arr.map(function(t, i) {
     var q = i < 8;
-    var verb = allDone ? (q ? 'Chiqdi' : 'Tushdi') : (q ? 'Chiqadi' : 'Tushadi');
-    var badge = '<span class="t3stat ' + (q ? 't3-q' : 't3-out') + '">' + verb + '</span>';
-    return '<tr class="' + (q ? 'q' : '') + (i === 7 ? ' cut' : '') + '">'
+    var status = ts[t.group]; // 'clinched' | 'eliminated' | null
+    var badge, rowCls;
+    if (status === 'clinched') {
+      badge = '<span class="t3stat t3-q">✓ Kafolat</span>'; rowCls = 'q';
+    } else if (status === 'eliminated') {
+      badge = '<span class="t3stat t3-out">✗ Imkonsiz</span>'; rowCls = 'elim';
+    } else {
+      var verb = allDone ? (q ? 'Chiqdi' : 'Tushdi') : (q ? 'Chiqadi' : 'Tushadi');
+      badge = '<span class="t3stat ' + (q ? 't3-q' : 't3-out') + '">' + verb + '</span>';
+      rowCls = q ? 'q' : '';
+    }
+    return '<tr class="' + rowCls + (i === 7 ? ' cut' : '') + '">'
       + '<td class="t3rank">' + (i + 1) + '</td>'
       + '<td class="l team"><span class="t3team">' + flagImg(t.name, 20)
         + '<span>' + esc(t.name) + '</span>'
@@ -1368,8 +1441,9 @@ function renderThird() {
     '<div class="t3card"><table class="t3tbl"><thead><tr>'
     + '<th>#</th><th class="l">Jamoa</th><th>Gr</th><th>O</th><th>G</th><th>D</th><th>M</th><th>G:Y</th><th>±</th><th>O\'</th><th>Holat</th>'
     + '</tr></thead><tbody>' + rows + '</tbody></table></div>'
-    + '<div class="rnote">Yashil — eng yaxshi 8 ta (1/16 finalga chiqadi). ● — guruh hali tugamagan, '
-    + 'ko\'rsatkichlar o\'zgarishi mumkin. Teng holatda FIFA fair-play va jahon reytingi mezonlari qo\'llanadi.</div>';
+    + '<div class="rnote">✓ Kafolat — matematik jihatdan eng yaxshi 8 talikka kirishi aniq. '
+    + '✗ Imkonsiz — endi 8 talikka kira olmaydi. Aks holda joriy o\'rin (● — guruh tugamagan, '
+    + 'o\'zgarishi mumkin). Teng holatda FIFA fair-play va jahon reytingi mezonlari qo\'llanadi.</div>';
 }
 
 // 1/16 final to'rlari (FIFA rasmiy jadvali, M73–M88).
