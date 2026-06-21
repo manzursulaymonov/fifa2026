@@ -157,6 +157,11 @@ main { position: relative; z-index: 1; max-width: 1440px; margin: 0 auto; paddin
 .gtbl tr.qual td:first-child { box-shadow: inset 3px 0 0 var(--lime2); }
 .gtbl tr.qual3 td:first-child { box-shadow: inset 3px 0 0 var(--gold2); }
 .gtbl tr.cutline td { border-bottom: 2px solid var(--goldbrd2); }
+.gtbl tr.elim td { opacity: .5; }
+.gtbl tr.elim .tname { text-decoration: line-through; text-decoration-color: var(--red); }
+.qbadge { margin-left: .3rem; font-size: .72rem; font-weight: 700; flex-shrink: 0; }
+.qbadge.qx { color: var(--red); }
+.qbadge.qok { color: var(--lime2); }
 .legend { display: flex; flex-wrap: wrap; gap: .4rem 1.1rem; margin-bottom: 1.1rem; font-size: .72rem; color: var(--muted); }
 .lg { display: flex; align-items: center; gap: .4rem; }
 .lgdot { width: 11px; height: 11px; border-radius: 3px; display: inline-block; flex-shrink: 0; }
@@ -328,6 +333,8 @@ main { position: relative; z-index: 1; max-width: 1440px; margin: 0 auto; paddin
       <span class="lg"><span class="lgdot lg-q12"></span>1-2 o'rin — 1/16 finalga chiqadi</span>
       <span class="lg"><span class="lgdot lg-q3"></span>3-o'rin — eng yaxshi 8 tasi chiqadi</span>
       <span class="lg"><span class="lgdot lg-out"></span>4-o'rin — tushadi</span>
+      <span class="lg"><span class="qbadge qok">✓</span>chiqishni kafolatladi</span>
+      <span class="lg"><span class="qbadge qx">✗</span>matematik imkoni qolmadi</span>
     </div>
     <div class="ggrid" id="ggrid"></div>
   </div>
@@ -1085,6 +1092,72 @@ function thirdPlaceRanking() {
   return arr;
 }
 
+// Guruhdan chiqish imkoniyatini matematik aniqlash.
+// Qolgan o'yinlarning BARCHA natija variantlari (3^n) sanab chiqiladi.
+//  eliminated = hech bir holatda top-3 ga kira olmaydi (1/8 finalga yo'l yo'q)
+//  clinched   = har qanday holatda ham top-2 (chiqishni kafolatladi)
+// Faqat ochkolar bo'yicha (teng ochkoda — foyda jamoa tomonida, ya'ni
+// hech qachon noto'g'ri eliminatsiya bermaydi). Guruh tugagan bo'lsa —
+// haqiqiy yakuniy jadval ishlatiladi.
+function analyzeGroup(group) {
+  var teams = GROUPS[group];
+  var res = {};
+  teams.forEach(function(n) { res[n] = { eliminated: false, clinched: false }; });
+
+  var played = FIXTURES.filter(function(f) { return f.group === group && f.homeScore !== null; });
+  var remaining = FIXTURES.filter(function(f) { return f.group === group && f.homeScore === null; });
+  if (played.length === 0) return res; // hali hech narsa hal bo'lmagan
+
+  // Guruh tugagan: yakuniy o'rinlarga qarab (GD tay-brek allaqachon hal bo'lgan)
+  if (remaining.length === 0) {
+    standings(group).forEach(function(t, i) {
+      res[t.name].eliminated = (i === 3); // 4-o'rin
+      res[t.name].clinched = (i <= 1);    // 1-2 o'rin
+    });
+    return res;
+  }
+
+  var basePts = {};
+  teams.forEach(function(n) { basePts[n] = 0; });
+  played.forEach(function(f) {
+    if (f.homeScore > f.awayScore) basePts[f.home] += 3;
+    else if (f.homeScore < f.awayScore) basePts[f.away] += 3;
+    else { basePts[f.home]++; basePts[f.away]++; }
+  });
+
+  // Boshlanishda hammasini "imkoni yo'q" va "kafolatlangan" deb olamiz,
+  // bitta variant aksini ko'rsatsa — bekor qilamiz
+  teams.forEach(function(n) { res[n].eliminated = true; res[n].clinched = true; });
+
+  var r = remaining.length;
+  var total = Math.pow(3, r);
+  for (var c = 0; c < total; c++) {
+    var pts = {};
+    teams.forEach(function(n) { pts[n] = basePts[n]; });
+    var x = c;
+    for (var i = 0; i < r; i++) {
+      var o = x % 3; x = Math.floor(x / 3);
+      var g = remaining[i];
+      if (o === 0) pts[g.home] += 3;
+      else if (o === 1) pts[g.away] += 3;
+      else { pts[g.home]++; pts[g.away]++; }
+    }
+    teams.forEach(function(n) {
+      var more = 0, fewer = 0;
+      teams.forEach(function(m) {
+        if (m === n) return;
+        if (pts[m] > pts[n]) more++;
+        else if (pts[m] < pts[n]) fewer++;
+      });
+      // top-3 mumkin (3-dan ko'p bo'lmagan jamoa qat'iy yuqori) → eliminatsiya emas
+      if (more <= 2) res[n].eliminated = false;
+      // kamida 2 jamoa qat'iy past bo'lmasa — top-2 kafolatlanmagan
+      if (fewer < 2) res[n].clinched = false;
+    });
+  }
+  return res;
+}
+
 // ═══════════════════════════════════════════════════
 // RENDER
 // ═══════════════════════════════════════════════════
@@ -1162,14 +1235,25 @@ function renderGroups() {
   document.getElementById('ggrid').innerHTML = Object.keys(GROUPS).map(function(g) {
     var st = standings(g);
     var played = FIXTURES.filter(function(f) { return f.group === g && f.homeScore !== null; }).length;
+    var an = analyzeGroup(g);
     var rows = st.map(function(t, i) {
       var pc = ['p1','p2','p3','p4'][Math.min(i,3)];
-      var rc = i < 2 ? ' class="qual' + (i === 1 ? ' cutline' : '') + '"' : (i === 2 ? ' class="qual3"' : '');
+      var fate = an[t.name] || {};
+      var cls = [];
+      if (i < 2) cls.push('qual');
+      if (i === 1) cls.push('cutline');
+      if (i === 2) cls.push('qual3');
+      if (fate.eliminated) cls.push('elim');
+      var rc = cls.length ? ' class="' + cls.join(' ') + '"' : '';
+      var mark = fate.eliminated
+        ? '<span class="qbadge qx" title="Matematik imkoni qolmadi">✗</span>'
+        : (fate.clinched ? '<span class="qbadge qok" title="Chiqishni kafolatladi">✓</span>' : '');
       return '<tr' + rc + '>'
         + '<td><div class="trow">'
         +   '<span class="pb ' + pc + '">' + (i+1) + '</span>'
         +   flagImg(t.name, 18)
         +   '<span class="tname" title="' + esc(t.name) + '">' + esc(shortName(t.name)) + '</span>'
+        +   mark
         + '</div></td>'
         + '<td>' + t.p + '</td><td>' + t.w + '</td><td>' + t.d + '</td><td>' + t.l + '</td>'
         + '<td>' + t.gf + ':' + t.ga + '</td>'

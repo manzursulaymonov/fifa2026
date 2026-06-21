@@ -442,6 +442,50 @@ check('shortName boshqa nomlarni o\'zgartirmaydi', sandbox.shortName('Uzbekistan
   check('qoidalar sahifasida head-to-head izohi', /o'zaro o'yin/i.test(rb) || /bevosita taqqoslash/.test(rb));
   check('qoidalarda 24 \\+ 8 = 32 tushuntirishi', /32 ta jamoa/.test(rb));
 
+  console.log('\n[24] Matematik eliminatsiya (analyzeGroup)');
+  // Guruh C: Haiti 3 o'yinni ham boy bergan (0 ochko, tugagan).
+  // Scotland 9 (tugagan), Brazil 3 va Morocco 3 — oxirgi o'yin bir-biri bilan (Brazil-Morocco).
+  // Har qanday natijada Brazil va Morocco ≥3 > 0 qoladi, Scotland 9 > 0 →
+  // uchala raqib ham Haiti'dan yuqori → Haiti matematik chiqa olmaydi.
+  setScore('Haiti', 'Scotland', 0, 1);
+  setScore('Scotland', 'Morocco', 1, 0);
+  setScore('Brazil', 'Haiti', 1, 0);
+  setScore('Scotland', 'Brazil', 1, 0);
+  setScore('Morocco', 'Haiti', 1, 0);
+  // Brazil-Morocco (g1) — qoldirilgan (null)
+  const anC = sandbox.analyzeGroup('C');
+  check('Haiti matematik eliminatsiya (0 ochko, 3 raqib yuqori)', anC.Haiti.eliminated === true);
+  check('Scotland top-2 ni kafolatladi (9 ochko)', anC.Scotland.clinched === true);
+  check('Brazil hali tirik (eliminatsiya emas)', anC.Brazil.eliminated === false);
+  check('Morocco hali tirik (eliminatsiya emas)', anC.Morocco.eliminated === false);
+  check('Brazil top-2 ni kafolatlamagan', anC.Brazil.clinched === false);
+
+  // Tugagan guruh A (bo'lim [20]): Czechia, S.Korea, Mexico, S.Africa
+  const anA = sandbox.analyzeGroup('A');
+  check('tugagan guruhda 4-o\'rin (S.Africa) eliminatsiya', anA['South Africa'].eliminated === true);
+  check('tugagan guruhda 3-o\'rin (Mexico) eliminatsiya emas', anA.Mexico.eliminated === false);
+  check('tugagan guruhda 1-2 (Czechia, S.Korea) kafolatlangan',
+    anA.Czechia.clinched === true && anA['South Korea'].clinched === true);
+
+  // O'ynalmagan guruh — hech kim eliminatsiya/kafolat emas
+  const anEmpty = sandbox.analyzeGroup('H');
+  check('o\'ynalmagan guruhda hech kim eliminatsiya emas',
+    Object.keys(anEmpty).every(k => !anEmpty[k].eliminated && !anEmpty[k].clinched));
+
+  // 2 o'yin qolganda (MD3 sinxron) hech kim eliminatsiya bo\'lmaydi:
+  // guruh D ga 4 o'yin qo'yamiz (har jamoa 1 o'yindan qoladi)
+  setScore('USA', 'Paraguay', 1, 0);
+  setScore('Australia', 'Türkiye', 1, 0);
+  setScore('USA', 'Australia', 1, 0);
+  setScore('Türkiye', 'Paraguay', 0, 0);
+  const anD = sandbox.analyzeGroup('D');
+  check('har jamoa 1 o\'yindan qolsa — hech kim eliminatsiya emas',
+    Object.keys(anD).every(k => !anD[k].eliminated));
+  check('renderGroups eliminatsiya bilan xatosiz', (() => {
+    try { sandbox.renderGroups(); return /class="[^"]*elim/.test(sandbox.document.getElementById('ggrid').innerHTML); }
+    catch (e) { return false; }
+  })());
+
   console.log('\n──────────────────────────────');
   console.log(passed + ' o\'tdi, ' + failed + ' yiqildi');
   process.exit(failed ? 1 : 0);

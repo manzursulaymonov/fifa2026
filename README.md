@@ -3,7 +3,8 @@ Jahon chempionati 2026 online natijalarni kuzatish
 
 Bitta `index.html` fayl. Sahifalar:
 - **Umumiy** — statistika, yaqinlashayotgan o'yinlar va oxirgi natijalar
-- **Guruhlar** — 12 guruh jadvali, 1/2/3-o'rin chiqish belgilari bilan
+- **Guruhlar** — 12 guruh jadvali; chiqish o'rinlari, top-2 ni **kafolatlagan** (✓) va
+  matematik **imkoni qolmagan** (✗) jamoalar belgilanadi
 - **3-O'rin** — eng yaxshi 8 ta 3-o'rin jamoasi reytingi (onlayn yangilanadi)
 - **O'yinlar** — barcha 72 guruh o'yini, sana bo'yicha
 - **To'purarlar** — gol uruvchilar reytingi
