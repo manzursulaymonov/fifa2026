@@ -598,11 +598,34 @@ check('shortName boshqa nomlarni o\'zgartirmaydi', sandbox.shortName('Uzbekistan
   check('yumshoq guruhlar 3-o\'rni ≤2 ochkoga tushadi', A.soft.every(s => s.info.minPts <= 2));
   check('qulflangan guruhlar 3-o\'rni ≥3 ochko', A.locked.every(l => l.info.minPts >= 3));
   check('FIFA reyting: Uzbekistan 50, DR Congo 43', sandbox.fifaRank('Uzbekistan') === 50 && sandbox.fifaRank('DR Congo') === 43);
+
+  // Minimal shartlar (ahamiyatsiz o'yinlar tashlanadi, eng zaif yetarli natija)
+  const condB = sandbox.collapseCondition('B', 2);
+  check('B sharti: faqat 1 ta o\'yin muhim (Switzerland o\'yini emas)',
+    condB.parts && condB.parts.length === 1 && condB.parts[0].m.indexOf('Qatar') >= 0);
+  check('B sharti: Bosnia–Qatar DURANG (faqat D)',
+    condB.parts[0].allowed.length === 1 && condB.parts[0].allowed[0] === 'D');
+  const condA = sandbox.collapseCondition('A', 2);
+  check('A sharti: 2 o\'yin, "yutadi yoki durang" (D va A)',
+    condA.parts && condA.parts.length === 2 &&
+    condA.parts.every(p => p.allowed.length === 2 && p.allowed.indexOf('D') >= 0));
+  const condG = sandbox.collapseCondition('G', 2);
+  check('G sharti: faqat "Egypt yutadi" (1 o\'yin, H)',
+    condG.parts && condG.parts.length === 1 && condG.parts[0].allowed.join('') === 'H');
+  const condI = sandbox.collapseCondition('I', 2);
+  check('I sharti: faqat "Senegal–Iraq durang"',
+    condI.parts && condI.parts.length === 1 && condI.parts[0].allowed.join('') === 'D'
+    && condI.parts[0].m.indexOf('Iraq') >= 0);
+  const lm = sandbox.lockedMin3GD('D');
+  check('lockedMin3GD(D): Paraguay eng yomon gol farqi -7', lm.name === 'Paraguay' && lm.gd === -7);
+
   let cErr = null;
   try { sandbox.renderChances(); } catch (e) { cErr = e; }
   check('renderChances xatosiz', !cErr, cErr && cErr.message);
   const cb = sandbox.document.getElementById('chances-body').innerHTML;
   check('sahifada DR Congo o\'yini va g\'alaba sharti', /DR Congo/.test(cb) && /3-o'rin/.test(cb));
+  check('sahifada "yutadi yoki durang" minimal shart', /yutadi yoki durang/.test(cb));
+  check('sahifada gol farqi narvoni va ehtimol', /to'p farqi|gol farqi/.test(cb) && /%/.test(cb));
 
   console.log('\n──────────────────────────────');
   console.log(passed + ' o\'tdi, ' + failed + ' yiqildi');

@@ -214,7 +214,12 @@ main { position: relative; z-index: 1; max-width: 1440px; margin: 0 auto; paddin
 .cmatch tr:last-child td { border-bottom: none; }
 .cmatch .cg { font-family: 'Bebas Neue'; color: var(--gold); font-size: 1rem; width: 48px; }
 .cmatch .cr { white-space: nowrap; color: var(--muted); font-family: 'DM Mono'; font-size: .76rem; }
+.cmatch .cp { white-space: nowrap; text-align: right; font-family: 'DM Mono'; font-size: .78rem; color: var(--gold2); width: 90px; }
+.cmatch th.cp { text-align: right; }
 .cmatch b { color: var(--text); }
+.cmatch .amp { color: var(--gold2); font-weight: 700; font-size: .72rem; font-family: 'DM Mono'; }
+.cmatch .bad { color: var(--red); } .cmatch .okc { color: var(--lime2); }
+.lad { display: inline-block; background: var(--chipbg); border-radius: 4px; padding: .05rem .4rem; margin: .1rem .2rem .1rem 0; font-family: 'DM Mono'; font-size: .76rem; color: var(--text2); }
 
 /* RULES PAGE */
 .rules { max-width: 900px; }
@@ -1418,6 +1423,109 @@ function chancesAnalysis(team) {
     need:need, canTop2:canTop2, canTop3:canTop3, verdict:verdict};
 }
 
+// Guruh 3-o'rni ≤thr ochkoga tushishi uchun MINIMAL shart
+// (ahamiyatsiz o'yinlar tashlanadi, eng zaif yetarli natija ko'rsatiladi)
+function uniqArr(a){ var o=[]; a.forEach(function(x){ if(o.indexOf(x)<0)o.push(x); }); return o; }
+function collapseCondition(g, thr) {
+  var teams=GROUPS[g], played=playedGamesG(g), rem=remGamesG(g);
+  if(rem.length===0){ var th=rankSim(teams,played)[2]; return {settled:true, ok:th.pts<=thr, rem:rem}; }
+  var combos=wdlAll(rem.length), good=[];
+  combos.forEach(function(c){
+    var games=played.slice();
+    c.forEach(function(r,i){ var s=wdlScore(r); games.push([rem[i][0],rem[i][1],s[0],s[1]]); });
+    if(rankSim(teams,games)[2].pts<=thr) good.push(c);
+  });
+  if(good.length===0) return {impossible:true, rem:rem};
+  if(good.length===combos.length) return {always:true, rem:rem};
+  var S=rem.map(function(_,i){ return uniqArr(good.map(function(c){return c[i];})); });
+  var prod=1; S.forEach(function(s){ prod*=s.length; });
+  if(prod===good.length){
+    var parts=[]; rem.forEach(function(m,i){ if(S[i].length<3) parts.push({m:m, allowed:S[i]}); });
+    return {parts:parts, rem:rem};
+  }
+  return {list:good, rem:rem};
+}
+function allowedText(m, al) {
+  var H=m[0], A=m[1], has=function(x){return al.indexOf(x)>=0;};
+  if(al.length===1){
+    if(has('D')) return '<b>'+esc(H)+'</b> – <b>'+esc(A)+'</b> durang';
+    return '<b>'+esc(has('H')?H:A)+'</b> yutadi';
+  }
+  if(al.length===2){
+    if(has('H')&&has('D')) return '<b>'+esc(H)+'</b> yutadi yoki durang';
+    if(has('A')&&has('D')) return '<b>'+esc(A)+'</b> yutadi yoki durang';
+    return esc(H)+' – '+esc(A)+' durang bo\'lmaydi';
+  }
+  return 'istalgan natija';
+}
+function condToHTML(c) {
+  if(c.always) return 'istalgan natija';
+  if(c.impossible) return '<span class="bad">imkonsiz</span>';
+  if(c.settled) return c.ok?'<span class="okc">bajarildi ✓</span>':'<span class="bad">bajarilmadi ✗</span>';
+  if(c.parts) return c.parts.map(function(p){return allowedText(p.m,p.allowed);}).join(' <span class="amp">VA</span> ');
+  if(c.list) return c.list.map(function(cc){ return cc.map(function(r,i){return allowedText(c.rem[i],[r]);}).join(' va '); }).join(' <i>yoki</i> ');
+  return '';
+}
+
+// Qulflangan guruh 3-o'rni 3 ochko bilan tugaganida olishi mumkin bo'lgan ENG PAST gol farqi
+function lockedMin3GD(g) {
+  var teams=GROUPS[g], played=playedGamesG(g), rem=remGamesG(g);
+  var SC=[]; for(var h=0;h<=5;h++)for(var a=0;a<=5;a++)SC.push([h,a]);
+  var minGd=Infinity, name=null;
+  (function rec(i,games){
+    if(i===rem.length){ var th=rankSim(teams,games)[2]; if(th.pts===3&&th.gd<minGd){minGd=th.gd;name=th.n;} return; }
+    SC.forEach(function(s){ rec(i+1, games.concat([[rem[i][0],rem[i][1],s[0],s[1]]])); });
+  })(0,played.slice());
+  return {gd:minGd===Infinity?null:minGd, name:name};
+}
+
+// Puasson Monte-Karlo: ehtimollar (jamoa hujum/himoya kuchidan)
+function poisSample(lam){ var L=Math.exp(-lam),k=0,p=1; do{k++;p*=Math.random();}while(p>L); return k-1; }
+function teamStrengths() {
+  var tg={}, total=0, gms=0;
+  Object.keys(GROUPS).forEach(function(g){ GROUPS[g].forEach(function(n){ tg[n]={gf:0,ga:0,g:0}; }); });
+  FIXTURES.forEach(function(f){ if(f.homeScore===null||!tg[f.home]||!tg[f.away])return;
+    tg[f.home].gf+=f.homeScore;tg[f.home].ga+=f.awayScore;tg[f.home].g++;
+    tg[f.away].gf+=f.awayScore;tg[f.away].ga+=f.homeScore;tg[f.away].g++;
+    total+=f.homeScore+f.awayScore; gms+=2; });
+  var lg=gms?total/gms:1.3;
+  Object.keys(tg).forEach(function(n){ var t=tg[n];
+    if(t.g){t.att=(t.gf/t.g)/lg;t.def=(t.ga/t.g)/lg;}else{t.att=1;t.def=1;} });
+  return {tg:tg, lg:lg};
+}
+function simChances(team, N) {
+  var g0=teamGroup(team), S=teamStrengths(), tg=S.tg, lg=S.lg, shr=0.7;
+  function eg(h,a){ var v=(1+(tg[h].att-1)*shr)*(1+(tg[a].def-1)*shr)*lg; return v<0.2?0.2:(v>5?5:v); }
+  var groups=Object.keys(GROUPS), played={}, rem={}, soft=[];
+  groups.forEach(function(g){ played[g]=playedGamesG(g); rem[g]=remGamesG(g); });
+  groups.forEach(function(g){ if(g!==g0&&groupThirdInfo(g).minPts<=2) soft.push(g); });
+  var own0=rankSim(GROUPS[g0],played[g0]).filter(function(x){return x.n===team;})[0];
+  var ownPts0=own0?own0.pts:0;
+  var win=0, qual=0, qualWin=0, ge4=0;
+  var coll={}; soft.forEach(function(g){coll[g]=0;});
+  for(var it=0;it<N;it++){
+    var thirds=[], uzb3=false, uzbW=false, nC=0;
+    for(var gi=0;gi<groups.length;gi++){ var g=groups[gi];
+      var games=played[g].slice();
+      for(var ri=0;ri<rem[g].length;ri++){ var m=rem[g][ri];
+        games.push([m[0],m[1],poisSample(eg(m[0],m[1])),poisSample(eg(m[1],m[0]))]); }
+      var so=rankSim(GROUPS[g],games);
+      thirds.push({g:g,pts:so[2].pts,gd:so[2].gd,gf:so[2].gf});
+      if(g===g0){ uzb3=(so[2].n===team); var me=so.filter(function(x){return x.n===team;})[0]; uzbW=(me.pts===ownPts0+3); }
+      else if(coll.hasOwnProperty(g)&&so[2].pts<=2){ coll[g]++; nC++; }
+    }
+    if(uzbW)win++;
+    thirds.sort(function(a,b){return b.pts-a.pts||b.gd-a.gd||b.gf-a.gf;});
+    var t8={}; thirds.slice(0,8).forEach(function(x){t8[x.g]=1;});
+    var q=uzb3&&t8[g0];
+    if(q)qual++;
+    if(uzbW){ if(q)qualWin++; if(nC>=4)ge4++; }
+  }
+  var cp={}; soft.forEach(function(g){ cp[g]=100*coll[g]/N; });
+  return {N:N, soft:soft, pWin:100*win/N, pQual:100*qual/N,
+    pQualWin:win?100*qualWin/win:0, pGe4Win:win?100*ge4/win:0, collapseP:cp};
+}
+
 // ═══════════════════════════════════════════════════
 // RENDER
 // ═══════════════════════════════════════════════════
@@ -1746,17 +1854,6 @@ function renderRules() {
 // ═══════════════════════════════════════════════════
 // CHIQISH STSENARIYLARI sahifasi
 // ═══════════════════════════════════════════════════
-function comboText(info) {
-  // info.combo + info.rem -> "X yutadi, durang" ko'rinishi va natija
-  if(!info.combo) return '';
-  return info.rem.map(function(m,i){
-    var c=info.combo[i];
-    if(c==='D') return esc(m[0])+' – '+esc(m[1])+' <b>durang</b>';
-    var w=c==='H'?m[0]:m[1];
-    return '<b>'+esc(w)+'</b> yutadi';
-  }).join(' · ');
-}
-
 function renderChances() {
   var el=document.getElementById('chances-body');
   var A=chancesAnalysis(MY_TEAM);
@@ -1767,8 +1864,10 @@ function renderChances() {
   }
   var o=A.own, oppMatch=o.ownMatch;
   var opp = oppMatch ? (oppMatch[0]===MY_TEAM?oppMatch[1]:oppMatch[0]) : null;
+  var alive = (A.verdict==='alive-third'||A.verdict==='alive-top2');
+  var mc=null; if(alive){ try{ mc=simChances(MY_TEAM,4000); }catch(e){} }
+  function pct(x){ return x.toFixed(x<10?1:0)+'%'; }
 
-  // Verdikt banneri
   var vmap={
     'qualified-top2':['ok','✅ CHIQDI','1/16 finalga to\'g\'ridan-to\'g\'ri yo\'l olindi (kafolatlangan).'],
     'alive-top2':['warn','🟢 TIRIK','Hatto to\'g\'ridan-to\'g\'ri (1-2 o\'rin) chiqish ham mumkin.'],
@@ -1777,9 +1876,9 @@ function renderChances() {
     'eliminated':['err','❌ CHIQA OLMAYDI','Matematik jihatdan keyingi bosqichга yo\'l qolmadi.']
   };
   var v=vmap[A.verdict]||vmap['eliminated'];
-  var html='<div class="vbanner '+v[0]+'"><div class="vttl">'+v[1]+'</div><div class="vsub">'+v[2]+'</div></div>';
+  var html='<div class="vbanner '+v[0]+'"><div class="vttl">'+v[1]+'</div><div class="vsub">'+v[2]
+    +(mc?(' <b>Model bahosi: chiqish ehtimoli ≈ '+pct(mc.pQual)+'</b>'):'')+'</div></div>';
 
-  // Joriy holat
   html+='<div class="cblock"><h3>📍 Hozirgi holat — Guruh '+A.group+'</h3>'
     +'<p>'+flagImg(MY_TEAM,20)+' <strong>'+esc(MY_TEAM)+'</strong>: '+o.pos+'-o\'rin · '
     +o.pts+' ochko · gol farqi '+(o.gd>0?'+':'')+o.gd+' · urilgan '+o.gf+' · maksimum '+o.maxPts+' ochko'
@@ -1792,55 +1891,77 @@ function renderChances() {
         +'3-o\'rinни olishingiz mumkin, lekin boshqa guruhlardagi natijalar yetarli emas: '
         +A.locked.length+' ta guruh 3-o\'rni doimo sizdan yuqori.</p></div>';
     }
-    document.getElementById('chances-body').innerHTML=html;
+    el.innerHTML=html;
     return;
   }
 
-  // 1) O'z o'yini
+  // 1) O'z o'yini + gol farqi narvoni
   if(opp){
-    var need3=reqLabel(o.top3), need2=reqLabel(o.top2);
     html+='<div class="cblock key"><h3>1️⃣ Sizning o\'yiningiz (3-tur)</h3>'
       +'<div class="bigmatch">'+flagImg(MY_TEAM,28)+' <span>'+esc(MY_TEAM)+'</span>'
       +' <em>vs</em> <span>'+esc(opp)+'</span> '+flagImg(opp,28)+'</div>';
-    if(A.canTop2){
-      html+='<p>1-2 o\'rin uchun: <b>'+need2+'</b>. 3-o\'rin uchun: <b>'+need3+'</b>.</p>';
-    } else {
-      html+='<p>To\'g\'ridan-to\'g\'ri chiqish (1-2) <b>imkonsiz</b>. 3-o\'rin uchun bu o\'yinda <b class="hl">'+need3+'</b>.</p>';
-    }
-    html+='<p class="cnote">⚽ <b>To\'plar nisbati muhim:</b> gol farqingiz hozir '+(o.gd>0?'+':'')+o.gd
-      +'. Iloji boricha <b>katta hisobда yutish</b> kerak — har qo\'shimcha gol gol farqi va urilgan gollarni '
-      +'oshiradi, bu esa 3 ochkoli boshqa jamoalardan tay-brekда o\'tishга yordam beradi.</p></div>';
+    if(A.canTop2) html+='<p>1-2 o\'rin uchun: <b>'+reqLabel(o.top2)+'</b>. 3-o\'rin uchun: <b>'+reqLabel(o.top3)+'</b>.</p>';
+    else html+='<p>To\'g\'ridan-to\'g\'ri chiqish (1-2) <b>imkonsiz</b>. Bu o\'yinda <b class="hl">'+reqLabel(o.top3)+'</b> — '
+      +'aks holда (durang yoki mag\'lubiyat) hatto 3-o\'rinни ham qo\'ldan boy berasiz.</p>';
+    if(mc) html+='<p class="cnote">📊 Model: bu o\'yinни yutish ehtimoli ≈ <b>'+pct(mc.pWin)+'</b>.</p>';
+    var lad=[1,2,3,4,5].map(function(m){ var ng=o.gd+m; return '<span class="lad">'+m+'-0 → '+(ng>0?'+':'')+ng+'</span>'; }).join('');
+    html+='<p class="cnote">⚽ <b>To\'plar farqi (nisbati) muhim:</b> hozir gol farqingiz '+(o.gd>0?'+':'')+o.gd
+      +', urilgan gol '+o.gf+' — 3-o\'rinlar ichida eng yomoni. Imkon qadar <b>katta hisobда yutish</b> kerak '
+      +'(toza darvoza bilan): '+lad+'. Yuqori gol farqi 3 ochkoli raqiblardan tay-brekда o\'tishга yordam beradi.</p></div>';
   }
 
-  // 2) Boshqa guruhlar (3-o'rin poygasi)
-  if(A.verdict==='alive-third'||A.verdict==='alive-top2'){
-    html+='<div class="cblock"><h3>2️⃣ Eng yaxshi 8 ta 3-o\'rin poygasi</h3>'
-      +'<p>Siz 3-o\'rinни olсангiz, 12 ta guruh 3-o\'rni ichida <b>eng yaxshi 8 tasi</b> chiqadi. '
-      +'<b>'+A.locked.length+' ta</b> guruh 3-o\'rni har doim ≥3 ochko (odatda sizdan yuqori), '
-      +'<b>'+A.soft.length+' ta</b> guruhда esa 3-o\'rinни ≤2 ochkoga tushirib bo\'ladi.</p>'
-      +'<p class="hl">➡️ Sizга <b>shu '+A.soft.length+' "yumshoq" guruhdан kamida '+A.need+' tasida</b> 3-o\'rin '
-      +'≤2 ochko bilan tugashi kerak.</p>';
-    // har bir yumshoq guruh + foydali natija
-    html+='<table class="cmatch"><thead><tr><th>Guruh</th><th>Foydali natija (3-tur)</th><th>3-o\'rin</th></tr></thead><tbody>';
+  // 2) Kerakli shartlar (W/D/L)
+  if(alive){
+    html+='<div class="cblock"><h3>2️⃣ Kerakli shartlar — '+A.soft.length+' tadan kamida '+A.need+' tasi</h3>'
+      +'<p>12 ta guruh 3-o\'rni ichida eng yaxshi 8 tasi chiqadi. <b>'+A.locked.length+' ta</b> guruh 3-o\'rni har doim ≥3 ochko '
+      +'(sizdan yuqori), shuning uchun siz 3-o\'rinни olсangiz ham <b class="hl">quyidagi '+A.soft.length+' shartdan kamida '
+      +A.need+' tasi</b> bajarilishi shart (har biri o\'sha guruh 3-o\'rnini ≤2 ochkoga tushiradi):</p>';
+    html+='<table class="cmatch"><thead><tr><th>Guruh</th><th>Minimal shart</th>'
+      +(mc?'<th class="cp">Ehtimol</th>':'')+'</tr></thead><tbody>';
     A.soft.forEach(function(s){
-      html+='<tr><td class="cg">'+s.g+'</td><td>'+comboText(s.info)+'</td>'
-        +'<td class="cr">'+esc(s.info.name)+' '+s.info.minPts+'och</td></tr>';
+      var cond=collapseCondition(s.g,2);
+      html+='<tr><td class="cg">'+s.g+'</td><td>'+condToHTML(cond)+'</td>'
+        +(mc?('<td class="cp">'+pct(mc.collapseP[s.g]||0)+'</td>'):'')+'</tr>';
     });
     html+='</tbody></table>';
-    html+='<p class="cnote">Doimo sizdan yuqori turадиган guruhlar (3-o\'rni ≥3): <b>'
-      +A.locked.map(function(l){return 'Guruh '+l.g;}).join(', ')+'</b>. '
-      +'Bularda yordam shart emas — ammo siz katta hisobда yutsangiz, ulardан ba\'zilaridан gol farqi hisobiga o\'tib ham ketishingiz mumkin.</p></div>';
+    if(mc) html+='<p class="cnote">📊 Model: g\'alabадан keyin ≥'+A.need+' shart bajarilishi ≈ <b>'+pct(mc.pGe4Win)
+      +'</b>; ya\'ni <b>yutsangiz</b> chiqish ehtimoli ≈ <b>'+pct(mc.pQualWin)+'</b>.</p>';
+    html+='<p class="cnote">Har doim sizdan yuqori (3-o\'rni ≥3): <b>'+A.locked.map(function(l){return l.g;}).join(', ')+'</b>.</p></div>';
   }
 
-  // 3) Tay-brek zanjiri
+  // 3) Gol farqi orqali qo'shimcha o'tishlar
+  if(alive){
+    var ot=A.locked.map(function(l){ var mg=lockedMin3GD(l.g); if(mg.gd===null)return null;
+      var K=mg.gd-o.gd+1; if(K<1)K=1; return {g:l.g,name:mg.name,gd:mg.gd,K:K}; })
+      .filter(Boolean).sort(function(a,b){return a.K-b.K;});
+    if(ot.length){
+      html+='<div class="cblock"><h3>3️⃣ Gol farqi orqali qo\'shimcha yo\'l</h3>'
+        +'<p>Agar shu jamoalar 3-o\'rinда 3 ochko bilan tugаса, ularning gol farqi yomon bo\'lса, '
+        +'siz <b>katta hisobда yutib</b> ulardан o\'tib ketishingiz mumkin — har bir o\'tish kerakli shartlar sonini '
+        +'1 ga kamaytiradi:</p>'
+        +'<table class="cmatch"><thead><tr><th>Guruh</th><th>3-o\'rin (eng yomon gol farqi)</th><th class="cp">Sizга kerak</th></tr></thead><tbody>';
+      ot.forEach(function(x){
+        html+='<tr><td class="cg">'+x.g+'</td><td>'+esc(x.name)+' (gol farqi '+(x.gd>0?'+':'')+x.gd+')</td>'
+          +'<td class="cp">≥'+x.K+' to\'p farqi</td></tr>';
+      });
+      html+='</tbody></table>'
+        +'<p class="cnote">Masalan '+(o.gd)+' dan '+ot[0].K+' to\'p farqi bilan yutсangiz, Guruh '+ot[0].g
+        +' 3-o\'rnidan (eng yomon holatida) o\'tib ketasiz.</p></div>';
+    }
+  }
+
+  // 4) Tay-brek zanjiri
   html+='<div class="cblock"><h3>⚖️ Tenglik (tay-brek) tartibi</h3>'
     +'<p>3-o\'rinlar shu tartibда taqqoslanadi: <b>1) ochko → 2) gol farqi → 3) urilgan gol → '
     +'4) fair-play → 5) FIFA jahon reytingi</b>. Sizning reytingingiz <b>#'+fifaRank(MY_TEAM)+'</b>. '
-    +'Aynan teng holatда reyting hал qiladi — masalan #'+fifaRank(MY_TEAM)+' Qatar(#'+fifaRank('Qatar')
+    +'Aynan teng holatда reyting hал qiladi — #'+fifaRank(MY_TEAM)+' Qatar(#'+fifaRank('Qatar')
     +'), Bosniya(#'+fifaRank('Bosnia and Herzegovina')+') dan yuqori, lekin Eron(#'+fifaRank('Iran')
     +'), Ekvador(#'+fifaRank('Ecuador')+') dan past.</p></div>';
 
-  document.getElementById('chances-body').innerHTML=html;
+  if(mc) html+='<p class="cnote" style="text-align:center">Ehtimollar — jamoalar formasiga asoslangan Puasson modeli ('
+    +mc.N.toLocaleString()+' simulyatsiya) bahosi, kafolat emas.</p>';
+
+  el.innerHTML=html;
 }
 
 // ═══════════════════════════════════════════════════
