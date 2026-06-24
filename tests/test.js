@@ -562,6 +562,48 @@ check('shortName boshqa nomlarni o\'zgartirmaydi', sandbox.shortName('Uzbekistan
     catch (e) { return false; }
   })());
 
+  console.log('\n[26] Uzbekistan chiqish stsenariysi (real joriy holat, MD2 dan keyin)');
+  FIXTURES.forEach(f => { f.homeScore = null; f.awayScore = null; f.status = 'NS'; f.scoreSource = null; });
+  function setM(t1, t2, s1, s2) {
+    const f = FIXTURES.find(x => (x.home === t1 && x.away === t2) || (x.home === t2 && x.away === t1));
+    if (!f) throw new Error('topilmadi: ' + t1 + ' / ' + t2);
+    if (f.home === t1) { f.homeScore = s1; f.awayScore = s2; } else { f.homeScore = s2; f.awayScore = s1; }
+    f.status = 'FT';
+  }
+  // Barcha 12 guruh, MD1-2 natijalari (openfootball)
+  setM('Mexico','South Africa',2,0); setM('South Korea','Czechia',2,1); setM('Czechia','South Africa',1,1); setM('Mexico','South Korea',1,0);
+  setM('Canada','Bosnia and Herzegovina',1,1); setM('Qatar','Switzerland',1,1); setM('Switzerland','Bosnia and Herzegovina',4,1); setM('Canada','Qatar',6,0);
+  setM('Brazil','Morocco',1,1); setM('Haiti','Scotland',0,1); setM('Scotland','Morocco',0,1); setM('Brazil','Haiti',3,0);
+  setM('USA','Paraguay',4,1); setM('Australia','Türkiye',2,0); setM('USA','Australia',2,0); setM('Türkiye','Paraguay',0,1);
+  setM('Germany','Curaçao',7,1); setM('Ivory Coast','Ecuador',1,0); setM('Germany','Ivory Coast',2,1); setM('Ecuador','Curaçao',0,0);
+  setM('Netherlands','Japan',2,2); setM('Sweden','Tunisia',5,1); setM('Netherlands','Sweden',5,1); setM('Tunisia','Japan',0,4);
+  setM('Belgium','Egypt',1,1); setM('Iran','New Zealand',2,2); setM('Belgium','Iran',0,0); setM('New Zealand','Egypt',1,3);
+  setM('Spain','Cape Verde',0,0); setM('Saudi Arabia','Uruguay',1,1); setM('Spain','Saudi Arabia',4,0); setM('Uruguay','Cape Verde',2,2);
+  setM('France','Senegal',3,1); setM('Iraq','Norway',1,4); setM('France','Iraq',3,0); setM('Norway','Senegal',3,2);
+  setM('Argentina','Algeria',3,0); setM('Austria','Jordan',3,1); setM('Argentina','Austria',2,0); setM('Jordan','Algeria',1,2);
+  setM('Portugal','DR Congo',1,1); setM('Uzbekistan','Colombia',1,3); setM('Portugal','Uzbekistan',5,0); setM('Colombia','DR Congo',1,0);
+  setM('England','Croatia',4,2); setM('Ghana','Panama',1,0); setM('England','Ghana',0,0); setM('Panama','Croatia',0,1);
+
+  const A = sandbox.chancesAnalysis('Uzbekistan');
+  check('verdikt: TIRIK — faqat 3-o\'rin orqali', A.verdict === 'alive-third');
+  check('to\'g\'ridan-to\'g\'ri (1-2) imkonsiz', A.canTop2 === false);
+  check('3-o\'rin uchun faqat g\'alaba kerak', sandbox.reqLabel(A.own.top3) === "faqat g'alaba");
+  check('Uzbekistan oxirgi o\'yini DR Congo bilan',
+    A.own.ownMatch && A.own.ownMatch.indexOf('DR Congo') >= 0 && A.own.ownMatch.indexOf('Uzbekistan') >= 0);
+  const lockedG = A.locked.map(x => x.g).sort().join('');
+  const softG = A.soft.map(x => x.g).sort().join('');
+  check('qulflangan guruhlar = C,D,F,J,L', lockedG === 'CDFJL', 'oldi: ' + lockedG);
+  check('yumshoq guruhlar = A,B,E,G,H,I', softG === 'ABEGHI', 'oldi: ' + softG);
+  check('kamida 4 ta yumshoq guruh qulashi kerak', A.need === 4);
+  check('yumshoq guruhlar 3-o\'rni ≤2 ochkoga tushadi', A.soft.every(s => s.info.minPts <= 2));
+  check('qulflangan guruhlar 3-o\'rni ≥3 ochko', A.locked.every(l => l.info.minPts >= 3));
+  check('FIFA reyting: Uzbekistan 50, DR Congo 43', sandbox.fifaRank('Uzbekistan') === 50 && sandbox.fifaRank('DR Congo') === 43);
+  let cErr = null;
+  try { sandbox.renderChances(); } catch (e) { cErr = e; }
+  check('renderChances xatosiz', !cErr, cErr && cErr.message);
+  const cb = sandbox.document.getElementById('chances-body').innerHTML;
+  check('sahifada DR Congo o\'yini va g\'alaba sharti', /DR Congo/.test(cb) && /3-o'rin/.test(cb));
+
   console.log('\n──────────────────────────────');
   console.log(passed + ' o\'tdi, ' + failed + ' yiqildi');
   process.exit(failed ? 1 : 0);

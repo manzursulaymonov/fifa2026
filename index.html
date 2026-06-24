@@ -188,6 +188,34 @@ main { position: relative; z-index: 1; max-width: 1440px; margin: 0 auto; paddin
 .t3-out { background: var(--livebg); color: var(--red); }
 .t3-prov { color: var(--gold2); font-size: .6rem; }
 
+/* CHANCES PAGE */
+#chances-body { max-width: 920px; }
+.vbanner { border-radius: 12px; padding: 1rem 1.25rem; margin-bottom: 1.1rem; border: 1px solid var(--border); }
+.vbanner.ok { background: var(--okbg); border-color: var(--lime2); }
+.vbanner.warn { background: var(--goldbg); border-color: var(--gold2); }
+.vbanner.err { background: var(--livebg); border-color: var(--red); }
+.vttl { font-family: 'Bebas Neue'; font-size: 1.5rem; letter-spacing: .04em; }
+.vbanner.ok .vttl { color: var(--lime2); } .vbanner.warn .vttl { color: var(--gold); } .vbanner.err .vttl { color: var(--red); }
+.vsub { font-size: .85rem; color: var(--text2); margin-top: .2rem; }
+.cblock { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 1.05rem 1.3rem; margin-bottom: 1rem; box-shadow: var(--shadow); }
+.cblock.key { border-color: var(--gold2); }
+.cblock h3 { font-family: 'Bebas Neue'; font-size: 1.15rem; letter-spacing: .05em; color: var(--gold); margin-bottom: .6rem; }
+.cblock p { font-size: .86rem; line-height: 1.6; color: var(--text2); margin-bottom: .5rem; }
+.cblock p:last-child { margin-bottom: 0; }
+.cblock strong, .cblock b { color: var(--text); }
+.cblock .hl { color: var(--gold); }
+.cblock b.hl { color: var(--gold); }
+.cnote { font-size: .8rem !important; color: var(--muted) !important; }
+.bigmatch { display: flex; align-items: center; gap: .5rem; font-family: 'Bebas Neue'; font-size: 1.3rem; letter-spacing: .03em; color: var(--text); margin: .3rem 0 .7rem; flex-wrap: wrap; }
+.bigmatch em { color: var(--muted); font-size: .9rem; font-style: normal; }
+.cmatch { width: 100%; border-collapse: collapse; font-size: .82rem; margin-top: .4rem; }
+.cmatch th { text-align: left; font-size: .58rem; text-transform: uppercase; letter-spacing: .07em; color: var(--muted); padding: .4rem .5rem; border-bottom: 1px solid var(--border2); font-family: 'DM Mono'; }
+.cmatch td { padding: .45rem .5rem; border-bottom: 1px solid var(--rowline); color: var(--text2); vertical-align: top; }
+.cmatch tr:last-child td { border-bottom: none; }
+.cmatch .cg { font-family: 'Bebas Neue'; color: var(--gold); font-size: 1rem; width: 48px; }
+.cmatch .cr { white-space: nowrap; color: var(--muted); font-family: 'DM Mono'; font-size: .76rem; }
+.cmatch b { color: var(--text); }
+
 /* RULES PAGE */
 .rules { max-width: 900px; }
 .rblock { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 1.1rem 1.35rem; margin-bottom: 1.1rem; box-shadow: var(--shadow); }
@@ -294,6 +322,7 @@ main { position: relative; z-index: 1; max-width: 1440px; margin: 0 auto; paddin
     <button class="act" data-page="overview" onclick="showPage('overview',this)">Umumiy</button>
     <button data-page="groups" onclick="showPage('groups',this)">Guruhlar</button>
     <button data-page="thirdplace" onclick="showPage('thirdplace',this)">3-O'rin</button>
+    <button data-page="chances" onclick="showPage('chances',this)">🇺🇿 Imkoniyat</button>
     <button data-page="matches" onclick="showPage('matches',this)">O'yinlar</button>
     <button data-page="scorers" onclick="showPage('scorers',this)">To'purarlar</button>
     <button data-page="rules" onclick="showPage('rules',this)">Qoidalar</button>
@@ -354,6 +383,11 @@ main { position: relative; z-index: 1; max-width: 1440px; margin: 0 auto; paddin
   <div id="page-rules" class="page">
     <div class="sec">Turnir Qoidalari va Tartibi</div>
     <div id="rules-body"></div>
+  </div>
+
+  <div id="page-chances" class="page">
+    <div class="sec">Uzbekistan — Chiqish Imkoniyatlari</div>
+    <div id="chances-body"></div>
   </div>
 
   <div id="page-matches" class="page">
@@ -917,6 +951,7 @@ function loadAll() {
       if (curPage === 'matches') renderMatches();
       if (curPage === 'scorers') renderScorers();
       if (curPage === 'rules') renderBracket();
+      if (curPage === 'chances') renderChances();
       loadAllScorers();
       apiLoading = false;
     });
@@ -1236,6 +1271,154 @@ function thirdAdvanceStatus() {
   return res;
 }
 
+// ═══════════════════════════════════════════════════
+// CHIQISH STSENARIYLARI (MY_TEAM uchun jonli tahlil)
+// FIFA reytingi — oxirgi tay-brek mezoni (11-iyun 2026 rasmiy)
+// ═══════════════════════════════════════════════════
+var MY_TEAM = 'Uzbekistan';
+var FIFA_RANK = {
+  'Argentina':1,'Spain':2,'France':3,'England':4,'Portugal':5,'Brazil':6,'Morocco':7,
+  'Netherlands':8,'Belgium':9,'Germany':10,'Croatia':11,'Colombia':13,'Mexico':14,
+  'Senegal':15,'Uruguay':16,'USA':17,'Japan':18,'Switzerland':19,'Iran':20,'Türkiye':22,
+  'Ecuador':23,'Austria':24,'South Korea':25,'Australia':27,'Algeria':28,'Egypt':29,
+  'Canada':30,'Norway':31,'Ivory Coast':33,'Panama':34,'Sweden':38,'Czechia':40,
+  'Paraguay':41,'Scotland':42,'DR Congo':43,'Tunisia':45,'Uzbekistan':50,'Qatar':56,
+  'Saudi Arabia':59,'Iraq':60,'South Africa':61,'Jordan':63,'Bosnia and Herzegovina':64,
+  'Cape Verde':67,'Ghana':73,'Curaçao':82,'Haiti':83,'New Zealand':85
+};
+function fifaRank(t) { return FIFA_RANK[t] || 999; }
+function teamGroup(team) {
+  var ks = Object.keys(GROUPS);
+  for (var i = 0; i < ks.length; i++) if (GROUPS[ks[i]].indexOf(team) >= 0) return ks[i];
+  return null;
+}
+function playedGamesG(g) {
+  return FIXTURES.filter(function(f){return f.group===g&&f.homeScore!==null;})
+    .map(function(f){return [f.home,f.away,f.homeScore,f.awayScore];});
+}
+function remGamesG(g) {
+  return FIXTURES.filter(function(f){return f.group===g&&f.homeScore===null;})
+    .map(function(f){return [f.home,f.away];});
+}
+// Tartiblash, h2h berilgan o'yinlardan (simulyatsiya). Oxirgi mezon — FIFA reytingi.
+function rankSim(teams, games) {
+  var t = {};
+  teams.forEach(function(n){ t[n] = {n:n,pts:0,gf:0,ga:0}; });
+  games.forEach(function(m){
+    var h=t[m[0]], a=t[m[1]]; if(!h||!a) return;
+    h.gf+=m[2];h.ga+=m[3];a.gf+=m[3];a.ga+=m[2];
+    if(m[2]>m[3])h.pts+=3; else if(m[2]<m[3])a.pts+=3; else {h.pts++;a.pts++;}
+  });
+  var arr = Object.keys(t).map(function(n){ var x=t[n]; x.gd=x.gf-x.ga; return x; });
+  arr.sort(function(a,b){
+    if(b.pts!==a.pts)return b.pts-a.pts;
+    var tied=arr.filter(function(z){return z.pts===a.pts;}).map(function(z){return z.n;});
+    if(tied.length>1&&tied.length<arr.length){
+      var h={}; tied.forEach(function(n){h[n]={pts:0,gd:0,gf:0};});
+      games.forEach(function(m){
+        if(tied.indexOf(m[0])<0||tied.indexOf(m[1])<0)return;
+        var H=h[m[0]],A=h[m[1]];H.gf+=m[2];H.gd+=m[2]-m[3];A.gf+=m[3];A.gd+=m[3]-m[2];
+        if(m[2]>m[3])H.pts+=3;else if(m[2]<m[3])A.pts+=3;else{H.pts++;A.pts++;}
+      });
+      if(h[b.n].pts!==h[a.n].pts)return h[b.n].pts-h[a.n].pts;
+      if(h[b.n].gd!==h[a.n].gd)return h[b.n].gd-h[a.n].gd;
+      if(h[b.n].gf!==h[a.n].gf)return h[b.n].gf-h[a.n].gf;
+    }
+    if(b.gd!==a.gd)return b.gd-a.gd;
+    if(b.gf!==a.gf)return b.gf-a.gf;
+    return fifaRank(a.n)-fifaRank(b.n);
+  });
+  return arr;
+}
+function wdlAll(n) {
+  var out=[]; (function rec(i,acc){ if(i===n){out.push(acc.slice());return;}
+    ['H','D','A'].forEach(function(c){acc.push(c);rec(i+1,acc);acc.pop();}); })(0,[]);
+  return out;
+}
+function wdlScore(c){ return c==='H'?[1,0]:(c==='A'?[0,1]:[0,0]); }
+
+// Guruh 3-o'rin: eng kam ochko va uni beradigan natija
+function groupThirdInfo(g) {
+  var teams=GROUPS[g], played=playedGamesG(g), rem=remGamesG(g);
+  if(rem.length===0){ var s=rankSim(teams,played); return {minPts:s[2].pts,name:s[2].n,settled:true,rem:rem}; }
+  var best=null;
+  wdlAll(rem.length).forEach(function(combo){
+    var games=played.slice();
+    combo.forEach(function(c,i){ var sc=wdlScore(c); games.push([rem[i][0],rem[i][1],sc[0],sc[1]]); });
+    var s=rankSim(teams,games), th=s[2];
+    if(best===null||th.pts<best.minPts){ best={minPts:th.pts,name:th.n,combo:combo}; }
+  });
+  return {minPts:best.minPts,name:best.name,combo:best.combo,rem:rem,settled:false};
+}
+
+// MY_TEAM o'z guruhi tahlili
+function ownOutlook(team) {
+  var g=teamGroup(team), teams=GROUPS[g], played=playedGamesG(g), rem=remGamesG(g);
+  var cur=rankSim(teams,played);
+  var me0=cur.filter(function(x){return x.n===team;})[0];
+  var pos0=cur.map(function(x){return x.n;}).indexOf(team)+1;
+  var ownIdx=rem.map(function(m){return m[0]===team||m[1]===team;}).indexOf(true);
+  var ownMatch=ownIdx>=0?rem[ownIdx]:null;
+  var t2={win:false,draw:false,loss:false}, t3={win:false,draw:false,loss:false};
+  function myRes(combo){
+    if(ownIdx<0)return 'none';
+    var c=combo[ownIdx], home=ownMatch[0]===team;
+    if(c==='D')return 'draw';
+    if(home)return c==='H'?'win':'loss';
+    return c==='A'?'win':'loss';
+  }
+  wdlAll(rem.length).forEach(function(combo){
+    var games=played.slice();
+    combo.forEach(function(c,i){ var sc=wdlScore(c); games.push([rem[i][0],rem[i][1],sc[0],sc[1]]); });
+    var s=rankSim(teams,games);
+    var p=s.map(function(x){return x.n;}).indexOf(team)+1;
+    var r=myRes(combo);
+    if(p<=2)t2[r]=true;
+    if(p<=3)t3[r]=true;
+  });
+  var remOwn=ownIdx>=0?1:0;
+  return {group:g, pos:pos0, pts:me0.pts, gd:me0.gd, gf:me0.gf, maxPts:me0.pts+3*remOwn,
+    ownMatch:ownMatch, top2:t2, top3:t3};
+}
+
+function reqLabel(o) {
+  // o = {win,draw,loss} — top-N uchun yetarli natijalar
+  if(o.win&&o.draw&&o.loss) return 'istalgan natija';
+  if(o.win&&o.draw) return "g'alaba yoki durang";
+  if(o.win) return "faqat g'alaba";
+  if(o.draw&&!o.win) return 'durang kerak';
+  return 'imkonsiz';
+}
+
+function chancesAnalysis(team) {
+  var g=teamGroup(team);
+  if(!g) return null;
+  var played=playedGamesG(g);
+  var anyPlayed=FIXTURES.some(function(f){return f.homeScore!==null;});
+  if(!anyPlayed) return {team:team, group:g, notStarted:true};
+  var own=ownOutlook(team);
+  var fate=analyzeGroup(g)[team]||{};
+  var others=Object.keys(GROUPS).filter(function(k){return k!==g;});
+  var locked=[], soft=[];
+  others.forEach(function(k){
+    var info=groupThirdInfo(k);
+    (info.minPts>=3?locked:soft).push({g:k,info:info});
+  });
+  var need=others.length-7; // top-8 ichida: shuncha boshqa guruh 3-o'rni pastda bo'lishi kerak
+  var canTop2 = own.top2.win||own.top2.draw||own.top2.loss;
+  var canTop3 = own.top3.win||own.top3.draw||own.top3.loss;
+  var thirdQualifiable = canTop3 && soft.length>=need && need>=0;
+  var verdict;
+  if(fate.clinched) verdict='qualified-top2';
+  else if(!canTop3) verdict='eliminated';
+  else if(canTop2) verdict='alive-top2';
+  else if(thirdQualifiable) verdict='alive-third';
+  else verdict='eliminated-third'; // 3-o'rin mumkin, lekin top-8 imkonsiz
+  return {team:team, group:g, own:own, fate:fate, locked:locked, soft:soft,
+    need:need, canTop2:canTop2, canTop3:canTop3, verdict:verdict};
+}
+
+// ═══════════════════════════════════════════════════
 // RENDER
 // ═══════════════════════════════════════════════════
 function renderAll() {
@@ -1561,6 +1744,106 @@ function renderRules() {
 }
 
 // ═══════════════════════════════════════════════════
+// CHIQISH STSENARIYLARI sahifasi
+// ═══════════════════════════════════════════════════
+function comboText(info) {
+  // info.combo + info.rem -> "X yutadi, durang" ko'rinishi va natija
+  if(!info.combo) return '';
+  return info.rem.map(function(m,i){
+    var c=info.combo[i];
+    if(c==='D') return esc(m[0])+' – '+esc(m[1])+' <b>durang</b>';
+    var w=c==='H'?m[0]:m[1];
+    return '<b>'+esc(w)+'</b> yutadi';
+  }).join(' · ');
+}
+
+function renderChances() {
+  var el=document.getElementById('chances-body');
+  var A=chancesAnalysis(MY_TEAM);
+  if(!A){ el.innerHTML='<div class="empty">Ma\'lumot yo\'q</div>'; return; }
+  if(A.notStarted){
+    el.innerHTML='<div class="empty"><div class="eic">⏳</div>Guruh o\'yinlari boshlanishi bilan '
+      +esc(MY_TEAM)+' imkoniyatlari hisoblanadi</div>'; return;
+  }
+  var o=A.own, oppMatch=o.ownMatch;
+  var opp = oppMatch ? (oppMatch[0]===MY_TEAM?oppMatch[1]:oppMatch[0]) : null;
+
+  // Verdikt banneri
+  var vmap={
+    'qualified-top2':['ok','✅ CHIQDI','1/16 finalga to\'g\'ridan-to\'g\'ri yo\'l olindi (kafolatlangan).'],
+    'alive-top2':['warn','🟢 TIRIK','Hatto to\'g\'ridan-to\'g\'ri (1-2 o\'rin) chiqish ham mumkin.'],
+    'alive-third':['warn','🟡 TIRIK — faqat 3-o\'rin orqali','To\'g\'ridan-to\'g\'ri chiqish imkonsiz; yagona yo\'l — 3-o\'rin + eng yaxshi 8 talik.'],
+    'eliminated-third':['err','🔴 IMKONSIZ','3-o\'rinни olса ham eng yaxshi 8 talikka kira olmaydi.'],
+    'eliminated':['err','❌ CHIQA OLMAYDI','Matematik jihatdan keyingi bosqichга yo\'l qolmadi.']
+  };
+  var v=vmap[A.verdict]||vmap['eliminated'];
+  var html='<div class="vbanner '+v[0]+'"><div class="vttl">'+v[1]+'</div><div class="vsub">'+v[2]+'</div></div>';
+
+  // Joriy holat
+  html+='<div class="cblock"><h3>📍 Hozirgi holat — Guruh '+A.group+'</h3>'
+    +'<p>'+flagImg(MY_TEAM,20)+' <strong>'+esc(MY_TEAM)+'</strong>: '+o.pos+'-o\'rin · '
+    +o.pts+' ochko · gol farqi '+(o.gd>0?'+':'')+o.gd+' · urilgan '+o.gf+' · maksimum '+o.maxPts+' ochko'
+    +' · FIFA reyting #'+fifaRank(MY_TEAM)+'</p>'
+    +'<p class="cnote">1-2 o\'rin: <b>'+reqLabel(o.top2)+'</b> &nbsp;|&nbsp; 3-o\'rin: <b>'+reqLabel(o.top3)+'</b></p></div>';
+
+  if(A.verdict==='eliminated'||A.verdict==='eliminated-third'){
+    if(A.verdict==='eliminated-third'){
+      html+='<div class="cblock"><h3>1️⃣ O\'z o\'yiningiz</h3><p>'+(opp?('<b>'+esc(opp)+'</b> bilan o\'yinда <b>'+reqLabel(o.top3)+'</b> — '):'')
+        +'3-o\'rinни olishingiz mumkin, lekin boshqa guruhlardagi natijalar yetarli emas: '
+        +A.locked.length+' ta guruh 3-o\'rni doimo sizdan yuqori.</p></div>';
+    }
+    document.getElementById('chances-body').innerHTML=html;
+    return;
+  }
+
+  // 1) O'z o'yini
+  if(opp){
+    var need3=reqLabel(o.top3), need2=reqLabel(o.top2);
+    html+='<div class="cblock key"><h3>1️⃣ Sizning o\'yiningiz (3-tur)</h3>'
+      +'<div class="bigmatch">'+flagImg(MY_TEAM,28)+' <span>'+esc(MY_TEAM)+'</span>'
+      +' <em>vs</em> <span>'+esc(opp)+'</span> '+flagImg(opp,28)+'</div>';
+    if(A.canTop2){
+      html+='<p>1-2 o\'rin uchun: <b>'+need2+'</b>. 3-o\'rin uchun: <b>'+need3+'</b>.</p>';
+    } else {
+      html+='<p>To\'g\'ridan-to\'g\'ri chiqish (1-2) <b>imkonsiz</b>. 3-o\'rin uchun bu o\'yinda <b class="hl">'+need3+'</b>.</p>';
+    }
+    html+='<p class="cnote">⚽ <b>To\'plar nisbati muhim:</b> gol farqingiz hozir '+(o.gd>0?'+':'')+o.gd
+      +'. Iloji boricha <b>katta hisobда yutish</b> kerak — har qo\'shimcha gol gol farqi va urilgan gollarni '
+      +'oshiradi, bu esa 3 ochkoli boshqa jamoalardan tay-brekда o\'tishга yordam beradi.</p></div>';
+  }
+
+  // 2) Boshqa guruhlar (3-o'rin poygasi)
+  if(A.verdict==='alive-third'||A.verdict==='alive-top2'){
+    html+='<div class="cblock"><h3>2️⃣ Eng yaxshi 8 ta 3-o\'rin poygasi</h3>'
+      +'<p>Siz 3-o\'rinни olсангiz, 12 ta guruh 3-o\'rni ichida <b>eng yaxshi 8 tasi</b> chiqadi. '
+      +'<b>'+A.locked.length+' ta</b> guruh 3-o\'rni har doim ≥3 ochko (odatda sizdan yuqori), '
+      +'<b>'+A.soft.length+' ta</b> guruhда esa 3-o\'rinни ≤2 ochkoga tushirib bo\'ladi.</p>'
+      +'<p class="hl">➡️ Sizга <b>shu '+A.soft.length+' "yumshoq" guruhdан kamida '+A.need+' tasida</b> 3-o\'rin '
+      +'≤2 ochko bilan tugashi kerak.</p>';
+    // har bir yumshoq guruh + foydali natija
+    html+='<table class="cmatch"><thead><tr><th>Guruh</th><th>Foydali natija (3-tur)</th><th>3-o\'rin</th></tr></thead><tbody>';
+    A.soft.forEach(function(s){
+      html+='<tr><td class="cg">'+s.g+'</td><td>'+comboText(s.info)+'</td>'
+        +'<td class="cr">'+esc(s.info.name)+' '+s.info.minPts+'och</td></tr>';
+    });
+    html+='</tbody></table>';
+    html+='<p class="cnote">Doimo sizdan yuqori turадиган guruhlar (3-o\'rni ≥3): <b>'
+      +A.locked.map(function(l){return 'Guruh '+l.g;}).join(', ')+'</b>. '
+      +'Bularda yordam shart emas — ammo siz katta hisobда yutsangiz, ulardан ba\'zilaridан gol farqi hisobiga o\'tib ham ketishingiz mumkin.</p></div>';
+  }
+
+  // 3) Tay-brek zanjiri
+  html+='<div class="cblock"><h3>⚖️ Tenglik (tay-brek) tartibi</h3>'
+    +'<p>3-o\'rinlar shu tartibда taqqoslanadi: <b>1) ochko → 2) gol farqi → 3) urilgan gol → '
+    +'4) fair-play → 5) FIFA jahon reytingi</b>. Sizning reytingingiz <b>#'+fifaRank(MY_TEAM)+'</b>. '
+    +'Aynan teng holatда reyting hал qiladi — masalan #'+fifaRank(MY_TEAM)+' Qatar(#'+fifaRank('Qatar')
+    +'), Bosniya(#'+fifaRank('Bosnia and Herzegovina')+') dan yuqori, lekin Eron(#'+fifaRank('Iran')
+    +'), Ekvador(#'+fifaRank('Ecuador')+') dan past.</p></div>';
+
+  document.getElementById('chances-body').innerHTML=html;
+}
+
+// ═══════════════════════════════════════════════════
 // DRAWER
 // ═══════════════════════════════════════════════════
 function openDrawer(fixId) {
@@ -1670,6 +1953,7 @@ function showPage(page, btn) {
   if (page === 'matches') renderMatches();
   if (page === 'scorers') renderScorers();
   if (page === 'rules') renderRules();
+  if (page === 'chances') renderChances();
   // URL hash — sahifani ulashish va "orqaga" tugmasi uchun
   try { if (location.hash !== '#' + page) location.hash = page; } catch (e) {}
 }

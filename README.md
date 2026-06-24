@@ -6,6 +6,9 @@ Bitta `index.html` fayl. Sahifalar:
 - **Guruhlar** — 12 guruh jadvali; chiqish o'rinlari, top-2 ni **kafolatlagan** (✓) va
   matematik **imkoni qolmagan** (✗) jamoalar belgilanadi
 - **3-O'rin** — eng yaxshi 8 ta 3-o'rin jamoasi reytingi (onlayn yangilanadi)
+- **Imkoniyat** — Uzbekistan'ning pley-offga chiqish stsenariylari: o'z o'yinida kerakli
+  natija (to'plar nisbati bilan), qaysi guruhlardagi qaysi o'yinlar qanday tugashi kerak,
+  va tay-brek zanjiri (gol farqi → urilgan gol → FIFA jahon reytingi)
 - **O'yinlar** — barcha 72 guruh o'yini, sana bo'yicha
 - **To'purarlar** — gol uruvchilar reytingi
 - **Qoidalar** — turnir formati, saralash mezonlari va pley-off tartibi
