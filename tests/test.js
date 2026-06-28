@@ -627,6 +627,53 @@ check('shortName boshqa nomlarni o\'zgartirmaydi', sandbox.shortName('Uzbekistan
   check('sahifada "yutadi yoki durang" minimal shart', /yutadi yoki durang/.test(cb));
   check('sahifada gol farqi narvoni va ehtimol', /to'p farqi|gol farqi/.test(cb) && /%/.test(cb));
 
+  console.log('\n[27] Pley-off — yakuniy holat (barcha 72 o\'yin tugagan)');
+  // [26] dan keyin MD3 natijalarini qo'shamiz (yakuniy holat)
+  setM('Czechia','Mexico',0,3); setM('South Africa','South Korea',1,0);
+  setM('Switzerland','Canada',2,1); setM('Bosnia and Herzegovina','Qatar',3,1);
+  setM('Scotland','Brazil',0,3); setM('Morocco','Haiti',4,2);
+  setM('Türkiye','USA',3,2); setM('Paraguay','Australia',0,0);
+  setM('Curaçao','Ivory Coast',0,2); setM('Ecuador','Germany',2,1);
+  setM('Japan','Sweden',1,1); setM('Tunisia','Netherlands',1,3);
+  setM('Egypt','Iran',1,1); setM('New Zealand','Belgium',1,5);
+  setM('Cape Verde','Saudi Arabia',0,0); setM('Uruguay','Spain',0,1);
+  setM('Norway','France',1,4); setM('Senegal','Iraq',5,0);
+  setM('Algeria','Austria',3,3); setM('Jordan','Argentina',1,3);
+  setM('Colombia','Portugal',0,0); setM('DR Congo','Uzbekistan',3,1);
+  setM('Panama','England',0,2); setM('Croatia','Ghana',2,1);
+
+  check('barcha guruhlar tugadi', sandbox.allGroupsDone() === true);
+  check('saralangan 8 ta 3-o\'rin guruhi = BDEFIJKL',
+    sandbox.qualifiedThirdGroups().slice().sort().join('') === 'BDEFIJKL');
+  const ta = sandbox.thirdAssign();
+  check('FIFA Annexe C taqsimoti to\'g\'ri (BDEFIJKL→DFEKBIJL)',
+    ta[74]==='D' && ta[77]==='F' && ta[79]==='E' && ta[80]==='K'
+    && ta[81]==='B' && ta[82]==='I' && ta[85]==='J' && ta[87]==='L');
+  check('g\'olib/2-o\'rin slotlari to\'g\'ri', sandbox.slotName('1A')==='Mexico'
+    && sandbox.slotName('2A')==='South Africa' && sandbox.slotName('1K')==='Colombia'
+    && sandbox.slotName('2B')==='Canada');
+  check('3-o\'rin slot jamoasi: M80 (Guruh K) = DR Congo', sandbox.thirdTeamForMatch(80)==='DR Congo');
+  check('3-o\'rin slot jamoasi: M74 (Guruh D) = Paraguay', sandbox.thirdTeamForMatch(74)==='Paraguay');
+  let pErr=null; try { sandbox.renderPlayoff(); } catch(e){ pErr=e; }
+  check('renderPlayoff xatosiz', !pErr, pErr && pErr.message);
+  const pb = sandbox.document.getElementById('playoff-body').innerHTML;
+  check('pley-off sahifasida FINAL va R32 jamoalari', /FINAL/.test(pb) && /Germany/.test(pb) && /DR Congo/.test(pb));
+  check('pley-off: keyingi bosqich placeholderlari (M.. g\'olibi)', /g'olibi/.test(pb));
+
+  // 3-o'rin sahifasi yakuniy
+  sandbox.renderThird();
+  const t3f = sandbox.document.getElementById('third-list').innerHTML;
+  check('3-o\'rin yakuniy: "✓ Chiqdi" va "✗ Chiqmadi"', /✓ Chiqdi/.test(t3f) && /✗ Chiqmadi/.test(t3f));
+
+  // Uzbekistan endi chiqib ketgan
+  check('Uzbekistan verdikt = eliminated (oxirgi o\'rin)',
+    sandbox.chancesAnalysis('Uzbekistan').verdict === 'eliminated');
+
+  // Overview pley-off ko'rsatadi
+  sandbox.renderOverviewLists();
+  const up = sandbox.document.getElementById('upcoming-list').innerHTML;
+  check('Umumiy: guruh tugagach pley-off o\'yinlari', /pley-off|Pley-off/i.test(up) && !/Barcha o'yinlar o'ynaldi/.test(up));
+
   console.log('\n──────────────────────────────');
   console.log(passed + ' o\'tdi, ' + failed + ' yiqildi');
   process.exit(failed ? 1 : 0);
