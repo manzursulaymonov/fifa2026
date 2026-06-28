@@ -659,6 +659,10 @@ check('shortName boshqa nomlarni o\'zgartirmaydi', sandbox.shortName('Uzbekistan
   const pb = sandbox.document.getElementById('playoff-body').innerHTML;
   check('pley-off sahifasida FINAL va R32 jamoalari', /FINAL/.test(pb) && /Germany/.test(pb) && /DR Congo/.test(pb));
   check('pley-off: keyingi bosqich placeholderlari (M.. g\'olibi)', /g'olibi/.test(pb));
+  check('pley-off: vizual setka (svg + chiziqlar)', /<svg class="brksvg"/.test(pb) && /<line /.test(pb));
+  check('pley-off: o\'yin soatlari ko\'rsatilgan', /\d\d:\d\d/.test(pb));
+  check('koTime mahalliy vaqt formati (HH:MM)', /^\d\d:\d\d$/.test(sandbox.koTime('2026-06-29T17:00:00Z')));
+  check('koWhen sana (kun-oy)', /^\d\d?-\w+$/.test(sandbox.koWhen('2026-06-29T17:00:00Z')));
 
   // 3-o'rin sahifasi yakuniy
   sandbox.renderThird();
