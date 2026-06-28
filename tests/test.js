@@ -678,6 +678,37 @@ check('shortName boshqa nomlarni o\'zgartirmaydi', sandbox.shortName('Uzbekistan
   const up = sandbox.document.getElementById('upcoming-list').innerHTML;
   check('Umumiy: guruh tugagach pley-off o\'yinlari', /pley-off|Pley-off/i.test(up) && !/Barcha o'yinlar o'ynaldi/.test(up));
 
+  console.log('\n[28] Jonli pley-off (g\'oliblar keyingi bosqichга o\'tadi)');
+  check('ofKoRound turlari', sandbox.ofKoRound('Round of 32')==='R32' && sandbox.ofKoRound('Semi-final')==='SF'
+    && sandbox.ofKoRound('Match for third place')==='3RD' && sandbox.ofKoRound('Final')==='FIN'
+    && sandbox.ofKoRound('Matchday 1')===null);
+  // R32 natijalari ingestKO orqali
+  sandbox.ingestKO([{h:'Germany',a:'Paraguay',hs:3,as:0},{h:'France',a:'Sweden',hs:2,as:1}]);
+  check('M74 g\'olibi Germany (1E vs 3-D)', sandbox.koWinner(74)==='Germany');
+  check('M77 g\'olibi France (1I vs 3-F)', sandbox.koWinner(77)==='France');
+  check('resolveSlot W74 → Germany', sandbox.resolveSlot('W74',89)==='Germany');
+  check('M89 jamoalari W74 vs W77 = Germany–France', (() => {
+    var t=sandbox.koTeams(89); return t.home==='Germany' && t.away==='France';
+  })());
+  // penalti bilan g'olib
+  sandbox.ingestKO([{h:'England',a:'DR Congo',hs:1,as:1,ph:4,pa:2}]);
+  check('penaltida g\'olib (M80 England)', sandbox.koWinner(80)==='England');
+  // kaskad: keyingi bosqichgа o'tish
+  sandbox.ingestKO([{h:'Germany',a:'Paraguay',hs:3,as:0},{h:'France',a:'Sweden',hs:2,as:1},{h:'Germany',a:'France',hs:1,as:0}]);
+  check('M89 g\'olibi Germany → M97 ga o\'tadi', sandbox.koWinner(89)==='Germany' && sandbox.resolveSlot('W89',97)==='Germany');
+  // render natija va g'olibni ko'rsatadi
+  sandbox.renderPlayoff();
+  const pb2=sandbox.document.getElementById('playoff-body').innerHTML;
+  check('pley-off natija (koscore) va g\'olib (win) ko\'rinadi', /koscore/.test(pb2) && /\bwin\b/.test(pb2));
+  // manba ajratish: openfootball KO ni _koEv ga yig'adi, guruh o'yinini emas
+  sandbox._koEv = [];
+  sandbox.applyOpenfootball({ matches:[
+    { round:'Group A', team1:'Mexico', team2:'South Africa', score:{ft:[2,0]} },
+    { round:'Round of 32', team1:'Germany', team2:'Paraguay', score:{ft:[3,0]} }
+  ]});
+  check('applyOpenfootball: faqat KO yig\'iladi (guruh emas)',
+    sandbox._koEv.length===1 && sandbox._koEv[0].h==='Germany');
+
   console.log('\n──────────────────────────────');
   console.log(passed + ' o\'tdi, ' + failed + ' yiqildi');
   process.exit(failed ? 1 : 0);

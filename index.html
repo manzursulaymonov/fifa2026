@@ -273,6 +273,16 @@ main { position: relative; z-index: 1; max-width: 1440px; margin: 0 auto; paddin
 .setka .ss + .ss { border-top: 1px solid var(--border2); margin-top: 2px; padding-top: 2px; }
 .setka .smn { position: absolute; top: -7px; left: 6px; font-family: 'DM Mono'; font-size: .5rem; color: var(--muted); background: var(--bg); padding: 0 3px; }
 .setka .smt { position: absolute; top: -7px; right: 6px; font-family: 'DM Mono'; font-size: .5rem; color: var(--gold2); background: var(--bg); padding: 0 3px; }
+.setka .ss .sc { margin-left: auto; padding-left: 4px; font-family: 'DM Mono'; font-size: .68rem; color: var(--text2); }
+.setka .ss .sc i { font-style: normal; font-size: .54rem; color: var(--muted); }
+.setka .ss.win { font-weight: 700; color: var(--text); }
+.setka .ss.win .sc { color: var(--lime2); }
+.setka .ss:not(.win) { color: var(--muted); }
+/* pley-off ro'yxat kartasi — natija va g'olib */
+.koside.win { font-weight: 700; }
+.koside.win > span { color: var(--lime2); }
+.koscore { font-family: 'Bebas Neue'; font-size: 1.15rem; letter-spacing: .04em; color: var(--gold); }
+.koscore i { font-style: normal; font-size: .62rem; color: var(--muted); font-family: 'DM Mono'; }
 
 /* FILTER */
 .fbar { display: flex; gap: .35rem; margin-bottom: 1.1rem; flex-wrap: wrap; }
@@ -848,6 +858,13 @@ function applyFifa(data) {
       var hn = r.Home && r.Home.TeamName && r.Home.TeamName[0] && r.Home.TeamName[0].Description;
       var an = r.Away && r.Away.TeamName && r.Away.TeamName[0] && r.Away.TeamName[0].Description;
       if (!hn || !an) return;
+      // Pley-off (KO_GUARD sanasidan keyin) — alohida yig'iladi
+      var fdate = String(r.Date || r.LocalDate || r.MatchDate || '').slice(0, 10);
+      if (fdate && fdate >= KO_GUARD) {
+        if ((r.MatchStatus === 0 || r.MatchStatus === 3) && typeof r.Home.Score === 'number' && typeof r.Away.Score === 'number')
+          pushKO(hn, an, r.Home.Score, r.Away.Score, r.HomeScorePenalty, r.AwayScorePenalty);
+        return;
+      }
       var m = matchFixture({ strHomeTeam: hn, strAwayTeam: an });
       if (!m) return;
       var fix = m.fix;
@@ -885,6 +902,12 @@ function applyOpenfootball(data) {
       var t1 = typeof mt.team1 === 'string' ? mt.team1 : (mt.team1 && mt.team1.name);
       var t2 = typeof mt.team2 === 'string' ? mt.team2 : (mt.team2 && mt.team2.name);
       if (!t1 || !t2) return;
+      // Pley-off o'yini (round bo'yicha) — alohida yig'iladi, guruhga tegmaydi
+      if (ofKoRound(mt.round)) {
+        var sk = mt.score && mt.score.ft;
+        if (sk) pushKO(t1, t2, sk[0], sk[1], mt.score.p && mt.score.p[0], mt.score.p && mt.score.p[1]);
+        return;
+      }
       var m = matchFixture({ strHomeTeam: t1, strAwayTeam: t2 });
       if (!m) return;
       var fix = m.fix;
@@ -925,6 +948,13 @@ function applyOpenfootball(data) {
 function applyEvents(events) {
   var matched = 0;
   events.forEach(function(ev) {
+    // Pley-off (KO_GUARD sanasidan keyin) — alohida yig'iladi
+    var ed = String(ev.dateEvent || '').slice(0, 10);
+    if (ed && ed >= KO_GUARD) {
+      var khs = parseInt(ev.intHomeScore, 10), kas = parseInt(ev.intAwayScore, 10);
+      if (!isNaN(khs) && !isNaN(kas)) pushKO(ev.strHomeTeam, ev.strAwayTeam, khs, kas);
+      return;
+    }
     var m = matchFixture(ev);
     if (!m) return;
     var fix = m.fix;
@@ -966,6 +996,7 @@ function loadAll() {
   apiLoading = true;
   setApi('spin', 'API...');
   var sources = [];
+  _koEv = [];
   fetchJson(FIFA_URL)
     .then(function(d) { applyFifa(d); sources.push('FIFA'); })
     .catch(function() {})
@@ -980,9 +1011,11 @@ function loadAll() {
         .catch(function() {});
     })
     .then(function() {
+      ingestKO(_koEv); // pley-off natijalarini setkaga joylash (g'oliblar o'tadi)
       var results = FIXTURES.filter(function(f) { return f.homeScore !== null; }).length;
+      var koN = Object.keys(koResults).length;
       if (sources.length) {
-        setApi('ok', sources.join('+') + ' · ' + results + ' natija');
+        setApi('ok', sources.join('+') + ' · ' + results + (koN ? '+' + koN : '') + ' natija');
       } else {
         setApi('err', 'API xatosi');
         showToast("API ga ulanib bo'lmadi", true);
@@ -1940,27 +1973,87 @@ function thirdTeamForMatch(m) {
   var a=thirdAssign(); if(!a||!a[m]) return null;
   var g=a[m]; return groupPlayed(g)===6 ? standings(g)[2].name : null;
 }
-function koSide(code, m, pool) {
-  if(code==='3'){ var n=thirdTeamForMatch(m); if(n) return flagImg(n,20)+' <span>'+esc(n)+'</span>';
-    return '<span class="bracket-slot">3-o\'rin'+(pool?' ('+pool+')':'')+'</span>'; }
-  if(/^[12][A-L]$/.test(code)){ var nm=slotName(code); if(nm) return flagImg(nm,20)+' <span>'+esc(nm)+'</span>';
-    var g=code.charAt(1); return '<span class="bracket-slot">Guruh '+g+(code.charAt(0)==='1'?' g\'olibi':' 2-o\'rin')+'</span>'; }
-  var typ=code.charAt(0)==='W'?'g\'olibi':'mag\'lubi';
-  return '<span class="bracket-slot">M'+code.slice(1)+' '+typ+'</span>';
-}
+// ═══════════════════════════════════════════════════
+// JONLI PLEY-OFF — manbalardan natijalar, g'olib keyingi bosqichga o'tadi
+// ═══════════════════════════════════════════════════
+var KO_GUARD = '2026-06-28';   // shu sanadan keyingi o'yinlar — pley-off (guruh emas)
+var koResults = {};            // matchNum -> {hs,as,ph,pa,done}
+var _koEv = [];                // manbalardan yig'ilgan pley-off natijalari
+var _koByNum = null;
 
 function koAllMatches() {
   return R32.map(function(x){ return {m:x.m, r:'R32', utc:x.utc, home:x.home, away:x.away, pool:x.pool, venue:x.venue}; })
     .concat(KO_LATER);
 }
-function koByNum() { var o={}; koAllMatches().forEach(function(x){ o[x.m]=x; }); return o; }
+function koByNum() { if(!_koByNum){ _koByNum={}; koAllMatches().forEach(function(x){ _koByNum[x.m]=x; }); } return _koByNum; }
 
-// Setka uchun qisqa tomon (bayroq + qisqa nom yoki placeholder)
+// Slot kodini haqiqiy jamoaga aylantiradi (W##/L## — natija bo'lsa)
+function resolveSlot(code, m) {
+  if(code==='3') return thirdTeamForMatch(m);
+  if(/^[12][A-L]$/.test(code)) return slotName(code);
+  var src=parseInt(code.slice(1),10), r=koResults[src];
+  if(!r||!r.done) return null;
+  return code.charAt(0)==='W' ? koWinner(src) : koLoser(src);
+}
+function koTeams(m) { var x=koByNum()[m]; if(!x) return null;
+  return { home: resolveSlot(x.home,m), away: resolveSlot(x.away,m) }; }
+function koWinner(m) { var r=koResults[m]; if(!r||!r.done) return null; var t=koTeams(m); if(!t) return null;
+  if(r.hs>r.as) return t.home; if(r.hs<r.as) return t.away;
+  if(r.ph!=null&&r.pa!=null) return r.ph>r.pa?t.home:t.away; return null; }
+function koLoser(m) { var w=koWinner(m); if(!w) return null; var t=koTeams(m); if(!t) return null;
+  return w===t.home?t.away:t.home; }
+
+function pushKO(h,a,hs,as,ph,pa) {
+  if(!h||!a||typeof hs!=='number'||typeof as!=='number') return;
+  _koEv.push({ h:h, a:a, hs:hs, as:as, ph:(typeof ph==='number'?ph:null), pa:(typeof pa==='number'?pa:null) });
+}
+function ofKoRound(r) { r=String(r||'').toLowerCase();
+  if(r.indexOf('third')>=0||r.indexOf('3rd')>=0) return '3RD';
+  if(r.indexOf('semi')>=0) return 'SF';
+  if(r.indexOf('quarter')>=0) return 'QF';
+  if(r.indexOf('round of 16')>=0||r.indexOf('last 16')>=0||r.indexOf('1/8')>=0) return 'R16';
+  if(r.indexOf('round of 32')>=0||r.indexOf('1/16')>=0) return 'R32';
+  if(r.indexOf('final')>=0) return 'FIN';
+  return null;
+}
+// Yig'ilgan natijalarni setkaga joylash — bosqichма-bosqich (fikspoint), jamoa juftligi bo'yicha
+function ingestKO(evs) {
+  koResults = {};
+  var all = koAllMatches(), assigned = [];
+  for(var pass=0; pass<6; pass++){
+    var changed=false;
+    for(var ei=0; ei<evs.length; ei++){
+      if(assigned[ei]) continue;
+      var e=evs[ei], eh=normTeam(e.h), ea=normTeam(e.a);
+      if(!eh||!ea){ assigned[ei]=true; continue; }
+      for(var i=0;i<all.length;i++){ var m=all[i].m;
+        if(koResults[m]) continue;
+        var rt=koTeams(m); if(!rt||!rt.home||!rt.away) continue;
+        var rh=normTeam(rt.home), ra=normTeam(rt.away);
+        if((rh===eh&&ra===ea)||(rh===ea&&ra===eh)){
+          var sw=(rh===ea);
+          koResults[m]={ hs: sw?e.as:e.hs, as: sw?e.hs:e.as, ph: sw?e.pa:e.ph, pa: sw?e.ph:e.pa, done:true };
+          assigned[ei]=true; changed=true; break;
+        }
+      }
+    }
+    if(!changed) break;
+  }
+}
+
+function koSide(code, m, pool) {
+  var n = resolveSlot(code, m);
+  if(n) return flagImg(n,20)+' <span>'+esc(n)+'</span>';
+  if(code==='3') return '<span class="bracket-slot">3-o\'rin'+(pool?' ('+pool+')':'')+'</span>';
+  if(/^[12][A-L]$/.test(code)){ var g=code.charAt(1); return '<span class="bracket-slot">Guruh '+g+(code.charAt(0)==='1'?' g\'olibi':' 2-o\'rin')+'</span>'; }
+  var typ=code.charAt(0)==='W'?'g\'olibi':'mag\'lubi';
+  return '<span class="bracket-slot">M'+code.slice(1)+' '+typ+'</span>';
+}
 function bracketSide(code, m, pool) {
-  if(code==='3'){ var n=thirdTeamForMatch(m); if(n) return flagImg(n,14)+'<span>'+esc(shortName(n))+'</span>';
-    return '<span class="ph">3-o\'rin</span>'; }
-  if(/^[12][A-L]$/.test(code)){ var nm=slotName(code); if(nm) return flagImg(nm,14)+'<span>'+esc(shortName(nm))+'</span>';
-    return '<span class="ph">'+code.charAt(1)+(code.charAt(0)==='1'?'·1':'·2')+'</span>'; }
+  var n = resolveSlot(code, m);
+  if(n) return flagImg(n,14)+'<span>'+esc(shortName(n))+'</span>';
+  if(code==='3') return '<span class="ph">3-o\'rin</span>';
+  if(/^[12][A-L]$/.test(code)) return '<span class="ph">'+code.charAt(1)+(code.charAt(0)==='1'?'·1':'·2')+'</span>';
   return '<span class="ph">M'+code.slice(1)+(code.charAt(0)==='W'?'':' m')+'</span>';
 }
 
@@ -1976,11 +2069,15 @@ function renderBracketTree() {
       var x=r*colW, yc=(i+0.5)*band; pos[m]={x:x,y:yc};
       var mt=by[m]; if(!mt) return;
       var pl=(mt.r==='R32'&&mt.away==='3')?mt.pool:false;
+      var rr=koResults[m], pld=rr&&rr.done, wn=pld?koWinner(m):null;
+      var ht=resolveSlot(mt.home,m), at=resolveSlot(mt.away,m);
+      var hsc=pld?'<span class="sc">'+rr.hs+(rr.ph!=null?'<i>('+rr.ph+')</i>':'')+'</span>':'';
+      var asc=pld?'<span class="sc">'+rr.as+(rr.pa!=null?'<i>('+rr.pa+')</i>':'')+'</span>':'';
       boxes+='<div class="sm'+(mt.r==='FIN'?' fin':'')+'" style="left:'+x+'px;top:'+(yc-mH/2)+'px;width:'+boxW+'px">'
         +'<span class="smn">M'+m+'</span>'
-        +'<div class="ss">'+bracketSide(mt.home,m,false)+'</div>'
-        +'<div class="ss">'+bracketSide(mt.away,m,pl)+'</div>'
-        +'<div class="smt">'+koTime(mt.utc)+'</div></div>';
+        +'<div class="ss'+(wn&&wn===ht?' win':'')+'">'+bracketSide(mt.home,m,false)+hsc+'</div>'
+        +'<div class="ss'+(wn&&wn===at?' win':'')+'">'+bracketSide(mt.away,m,pl)+asc+'</div>'
+        +'<div class="smt">'+(pld?'tugadi':koTime(mt.utc))+'</div></div>';
     });
   });
   BR_ROUNDS.forEach(function(col,r){
@@ -2017,11 +2114,16 @@ function renderPlayoff() {
     html+='<div class="kosec"><h3>'+rd[1]+'</h3><div class="komlist">';
     ms.forEach(function(x){
       var pl=(x.r==='R32'&&x.away==='3')?x.pool:false;
-      html+='<div class="kocard'+(rd[0]==='FIN'?' fin':'')+'">'
+      var rr=koResults[x.m], pld=rr&&rr.done, wn=pld?koWinner(x.m):null;
+      var ht=resolveSlot(x.home,x.m), at=resolveSlot(x.away,x.m);
+      var mid = pld
+        ? '<span class="koscore">'+rr.hs+'–'+rr.as+(rr.ph!=null?' <i>('+rr.ph+'-'+rr.pa+'p)</i>':'')+'</span>'
+        : koTime(x.utc);
+      html+='<div class="kocard'+(rd[0]==='FIN'?' fin':'')+(pld?' played':'')+'">'
         + '<div class="kom">M'+x.m+'</div>'
-        + '<div class="koside h">'+koSide(x.home,x.m,false)+'</div>'
-        + '<div class="kovs">'+koTime(x.utc)+'</div>'
-        + '<div class="koside a">'+koSide(x.away,x.m,pl)+'</div>'
+        + '<div class="koside h'+(wn&&wn===ht?' win':'')+'">'+koSide(x.home,x.m,false)+'</div>'
+        + '<div class="kovs">'+mid+'</div>'
+        + '<div class="koside a'+(wn&&wn===at?' win':'')+'">'+koSide(x.away,x.m,pl)+'</div>'
         + '<div class="kodate">'+koWhen(x.utc)+(x.venue?' · '+esc(x.venue):'')+'</div>'
         + '</div>';
     });

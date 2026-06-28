@@ -6,8 +6,10 @@ Bitta `index.html` fayl. Sahifalar:
 - **Guruhlar** — 12 guruh jadvali; chiqish o'rinlari, top-2 ni **kafolatlagan** (✓) va
   matematik **imkoni qolmagan** (✗) jamoalar belgilanadi
 - **3-O'rin** — eng yaxshi 8 ta 3-o'rin jamoasi reytingi (onlayn yangilanadi)
-- **Pley-off** — to'liq chiqaruv bosqichi (1/16 → final), guruhlar tugagach jamoalar
-  bilan to'ladi; 3-o'rinlar FIFA Annexe C taqsimot jadvali bo'yicha joylashtiriladi
+- **Pley-off** — to'liq chiqaruv bosqichi (1/16 → final) vizual setka + soatlar bilan;
+  guruhlar tugagach jamoalar bilan to'ladi (3-o'rinlar FIFA Annexe C jadvali bo'yicha),
+  pley-off o'yinlari o'ynalgani sayin natijalar va g'oliblar keyingi bosqichга
+  avtomatik (jonli) o'tadi
 - **Imkoniyat** — Uzbekistan'ning pley-offga chiqish stsenariylari: o'z o'yinida kerakli
   natija (to'plar nisbati bilan), qaysi guruhlardagi qaysi o'yinlar qanday tugashi kerak,
   va tay-brek zanjiri (gol farqi → urilgan gol → FIFA jahon reytingi)
