@@ -743,6 +743,36 @@ check('shortName boshqa nomlarni o\'zgartirmaydi', sandbox.shortName('Uzbekistan
     sandbox.allScorers['KO Tester Ikki'] && sandbox.allScorers['KO Tester Ikki'].goals === 1);
   check('avtogol to\'purarlarga qo\'shilmaydi', !sandbox.allScorers['KO Avtogol']);
 
+  // (1b) Pley-off o'yin tafsiloti (drawer) — kim gol urgani, penalti, g'olib, stadion
+  const kt75 = sandbox.koTeams(75);
+  sandbox.koResults[75] = { hs:2, as:1, ph:5, pa:4, aet:true, decisive:true, done:true,
+    homeTeam:kt75.home, awayTeam:kt75.away,
+    homeScorers:[{name:'Drawer Player A', time:'23', type:'Normal Goal'},
+                 {name:'Drawer Player A', time:'67', type:'Penalty'}],
+    awayScorers:[{name:'Drawer Player B', time:'80', type:'Own Goal'}] };
+  sandbox.openKoDrawer(75);
+  const dbody = sandbox.document.getElementById('drawer-body').innerHTML;
+  const dtitle = sandbox.document.getElementById('drawer-title').textContent;
+  check('KO drawer: sarlavhada bosqich + sana', /1\/16 final/.test(dtitle) && /iyun|iyul/.test(dtitle));
+  check('KO drawer: hisob (2 — 1)', /2 — 1/.test(dbody));
+  check('KO drawer: penalti qatori (5 — 4)', /Penaltilar: 5 — 4/.test(dbody));
+  check('KO drawer: gol urganlar ro\'yxati', /Drawer Player A/.test(dbody) && /Drawer Player B/.test(dbody));
+  check('KO drawer: gol turi badge (Own Goal)', /goal-type/.test(dbody) && /Own Goal/.test(dbody));
+  check('KO drawer: g\'olib belgilanadi (dwin + 🏆)', /dwin/.test(dbody) && /🏆/.test(dbody));
+  check('KO drawer: stadion ko\'rsatiladi', /Gillette Stadium/.test(dbody));
+  // O'ynalmagan o'yin: "VS" va izoh
+  sandbox.openKoDrawer(100);
+  const dbody2 = sandbox.document.getElementById('drawer-body').innerHTML;
+  check('KO drawer: o\'ynalmagan o\'yin "VS" va izoh', /VS/.test(dbody2) && /hali o'ynalmagan/.test(dbody2));
+  // Kartalarda bosish (onclick) mavjud
+  const mc75 = sandbox.koMiniCard(sandbox.koAllMatches().find(function(x){ return x.m===75; }));
+  check('koMiniCard: onclick=openKoDrawer', /onclick="openKoDrawer\(75\)"/.test(mc75));
+  sandbox.renderPlayoff();
+  const pbodyKo = sandbox.document.getElementById('playoff-body').innerHTML;
+  check('renderPlayoff/setka: kartalar bosiladi (openKoDrawer)',
+    /class="kocard[^"]*"[^>]*onclick="openKoDrawer\(/.test(pbodyKo)
+    && /class="sm[^"]*"[^>]*onclick="openKoDrawer\(/.test(pbodyKo));
+
   // (2) Qo'shimcha vaqt (ET) — openfootball et hisobini oladi (issue #2)
   sandbox._koEv = [];
   sandbox.applyOpenfootball({ matches:[
