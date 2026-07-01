@@ -832,6 +832,23 @@ function matchFixture(ev) {
   return null;
 }
 
+// Voqea sanasi guruh o'yini sanasiga yaqinmi (kunlar bo'yicha).
+// Guruh o'yini bilan pley-off (o'sha juftlik qayta uchrashishi) ni ajratadi.
+// Sana yo'q bo'lsa — rad etmaymiz (lenient).
+function withinDays(dateStr, fixtureUtc, days) {
+  if (!dateStr) return true;
+  var a = new Date(dateStr + 'T00:00:00Z').getTime();
+  var b = new Date(String(fixtureUtc).slice(0, 10) + 'T00:00:00Z').getTime();
+  if (isNaN(a) || isNaN(b)) return true;
+  return Math.abs(a - b) <= days * 86400000;
+}
+// Voqea guruh o'yinimi? Juftlik guruh FIXTURE ga mos VA sanasi yaqin bo'lsa.
+function groupMatchOf(home, away, dateStr) {
+  var m = matchFixture({ strHomeTeam: home, strAwayTeam: away });
+  if (m && withinDays(dateStr, m.fix.utc, 3)) return m;
+  return null;
+}
+
 // ═══════════════════════════════════════════════════
 // API LOADING — uch mustaqil manba, ustuvorlik tartibida:
 //   1) api.fifa.com (rasmiy)  — hisob, holat (jonli), stadion
@@ -858,15 +875,17 @@ function applyFifa(data) {
       var hn = r.Home && r.Home.TeamName && r.Home.TeamName[0] && r.Home.TeamName[0].Description;
       var an = r.Away && r.Away.TeamName && r.Away.TeamName[0] && r.Away.TeamName[0].Description;
       if (!hn || !an) return;
-      // Pley-off (KO_GUARD sanasidan keyin) — alohida yig'iladi
       var fdate = String(r.Date || r.LocalDate || r.MatchDate || '').slice(0, 10);
-      if (fdate && fdate >= KO_GUARD) {
-        if ((r.MatchStatus === 0 || r.MatchStatus === 3) && typeof r.Home.Score === 'number' && typeof r.Away.Score === 'number')
-          pushKO(hn, an, r.Home.Score, r.Away.Score, r.HomeScorePenalty, r.AwayScorePenalty);
+      // Guruh o'yini bo'lmasa (juftlik/sana mos emas) — pley-off nomzodi
+      var m = groupMatchOf(hn, an, fdate);
+      if (!m) {
+        if ((r.MatchStatus === 0 || r.MatchStatus === 3) && typeof r.Home.Score === 'number' && typeof r.Away.Score === 'number') {
+          var pen = (typeof r.HomeScorePenalty === 'number' && typeof r.AwayScorePenalty === 'number');
+          pushKO(hn, an, r.Home.Score, r.Away.Score,
+            pen ? r.HomeScorePenalty : null, pen ? r.AwayScorePenalty : null);
+        }
         return;
       }
-      var m = matchFixture({ strHomeTeam: hn, strAwayTeam: an });
-      if (!m) return;
       var fix = m.fix;
       if (r.Stadium && r.Stadium.Name && r.Stadium.Name[0]) {
         var city = r.Stadium.CityName && r.Stadium.CityName[0] ? ', ' + r.Stadium.CityName[0].Description : '';
@@ -893,8 +912,13 @@ function applyFifa(data) {
   return matched;
 }
 
+// openfootball gol yozuvini standart shaklga aylantiradi
+function ofGoal(g) {
+  return { name: g.name || '', time: (g.minute != null ? String(g.minute) : ''),
+    type: g.penalty ? 'Penalty' : (g.owngoal ? 'Own Goal' : 'Normal Goal') };
+}
 // openfootball: matches[i] = { team1, team2 (satr yoki {name}),
-//   score: {ft:[a,b]}, goals1/goals2: [{name, minute, penalty?, owngoal?}] }
+//   score: {ft:[a,b], et:[a,b], p:[a,b]}, goals1/goals2: [{name, minute, penalty?, owngoal?}] }
 function applyOpenfootball(data) {
   var used = 0;
   ((data && data.matches) || []).forEach(function(mt) {
@@ -902,10 +926,16 @@ function applyOpenfootball(data) {
       var t1 = typeof mt.team1 === 'string' ? mt.team1 : (mt.team1 && mt.team1.name);
       var t2 = typeof mt.team2 === 'string' ? mt.team2 : (mt.team2 && mt.team2.name);
       if (!t1 || !t2) return;
-      // Pley-off o'yini (round bo'yicha) — alohida yig'iladi, guruhga tegmaydi
+      // Pley-off o'yini (round bo'yicha) — alohida yig'iladi, guruhga tegmaydi.
+      // Qo'shimcha vaqt (et) bo'lsa — yakuniy hisob shu; penalti (p); gol uruvchilar.
       if (ofKoRound(mt.round)) {
-        var sk = mt.score && mt.score.ft;
-        if (sk) pushKO(t1, t2, sk[0], sk[1], mt.score.p && mt.score.p[0], mt.score.p && mt.score.p[1]);
+        var et = mt.score && mt.score.et, ft = mt.score && mt.score.ft;
+        var sc = (et && et.length === 2) ? et : ft;
+        if (sc && sc.length === 2) {
+          var pp = mt.score && mt.score.p;
+          pushKO(t1, t2, sc[0], sc[1], pp && pp[0], pp && pp[1], !!(et && et.length === 2),
+            (mt.goals1 || []).map(ofGoal), (mt.goals2 || []).map(ofGoal));
+        }
         return;
       }
       var m = matchFixture({ strHomeTeam: t1, strAwayTeam: t2 });
@@ -926,15 +956,8 @@ function applyOpenfootball(data) {
       // Gol ro'yxati hisobni to'liq qoplasagina ishonchli manba deb olamiz
       var g1 = mt.goals1 || [], g2 = mt.goals2 || [];
       if (hs + as > 0 && g1.length + g2.length === hs + as) {
-        var conv = function(g) {
-          return {
-            name: g.name || '',
-            time: g.minute != null ? String(g.minute) : '',
-            type: g.penalty ? 'Penalty' : (g.owngoal ? 'Own Goal' : 'Normal Goal')
-          };
-        };
-        fix.homeScorers = (m.swapped ? g2 : g1).map(conv);
-        fix.awayScorers = (m.swapped ? g1 : g2).map(conv);
+        fix.homeScorers = (m.swapped ? g2 : g1).map(ofGoal);
+        fix.awayScorers = (m.swapped ? g1 : g2).map(ofGoal);
         fix.goalsSource = 'of';
         used++;
       }
@@ -948,15 +971,17 @@ function applyOpenfootball(data) {
 function applyEvents(events) {
   var matched = 0;
   events.forEach(function(ev) {
-    // Pley-off (KO_GUARD sanasidan keyin) — alohida yig'iladi
     var ed = String(ev.dateEvent || '').slice(0, 10);
-    if (ed && ed >= KO_GUARD) {
+    // Guruh o'yini bo'lmasa — pley-off nomzodi
+    var m = groupMatchOf(ev.strHomeTeam, ev.strAwayTeam, ed);
+    if (!m) {
       var khs = parseInt(ev.intHomeScore, 10), kas = parseInt(ev.intAwayScore, 10);
-      if (!isNaN(khs) && !isNaN(kas)) pushKO(ev.strHomeTeam, ev.strAwayTeam, khs, kas);
+      var php = parseInt(ev.intHomeScorePenalty, 10), pap = parseInt(ev.intAwayScorePenalty, 10);
+      if (!isNaN(khs) && !isNaN(kas))
+        pushKO(ev.strHomeTeam, ev.strAwayTeam, khs, kas,
+          isNaN(php) ? null : php, isNaN(pap) ? null : pap);
       return;
     }
-    var m = matchFixture(ev);
-    if (!m) return;
     var fix = m.fix;
     fix.apiId = ev.idEvent;
     fix.apiSwapped = m.swapped;
@@ -991,12 +1016,26 @@ function loadTsdbEvents() {
 
 var apiLoading = false;
 
+// Manba jonli deb belgilagan o'yin tugagach uni yangilamasa, "JONLI" muzlab qoladi.
+// Boshlanish + ~2.5 soatdan oshgan jonli o'yinni FT ga tushiramiz.
+function demoteStaleLive() {
+  var now = Date.now();
+  FIXTURES.forEach(function(f) {
+    if (f.homeScore === null) return;
+    var s = String(f.status || '').toUpperCase().trim();
+    if (LIVE_STATUSES.indexOf(s) < 0) return;
+    var t = new Date(f.utc).getTime();
+    if (!isNaN(t) && now > t + 2.5 * 3600 * 1000) { f.status = 'FT'; f.minute = null; }
+  });
+}
+
 function loadAll() {
   if (apiLoading) return;
   apiLoading = true;
   setApi('spin', 'API...');
   var sources = [];
   _koEv = [];
+  demoteStaleLive(); // eskirgan "JONLI" holatni FT ga tushiramiz (manba uni tashlab ketsa)
   fetchJson(FIFA_URL)
     .then(function(d) { applyFifa(d); sources.push('FIFA'); })
     .catch(function() {})
@@ -1011,27 +1050,30 @@ function loadAll() {
         .catch(function() {});
     })
     .then(function() {
-      ingestKO(_koEv); // pley-off natijalarini setkaga joylash (g'oliblar o'tadi)
-      var results = FIXTURES.filter(function(f) { return f.homeScore !== null; }).length;
-      var koN = Object.keys(koResults).length;
-      if (sources.length) {
-        setApi('ok', sources.join('+') + ' · ' + results + (koN ? '+' + koN : '') + ' natija');
-      } else {
-        setApi('err', 'API xatosi');
-        showToast("API ga ulanib bo'lmadi", true);
-      }
-      buildScorerTotals();
-      renderAll();
-      if (curPage === 'groups') renderGroups();
-      if (curPage === 'thirdplace') renderThird();
-      if (curPage === 'matches') renderMatches();
-      if (curPage === 'scorers') renderScorers();
-      if (curPage === 'rules') renderBracket();
-      if (curPage === 'chances') renderChances();
-      if (curPage === 'playoff') renderPlayoff();
-      loadAllScorers();
-      apiLoading = false;
-    });
+      try {
+        ingestKO(_koEv); // pley-off natijalarini setkaga joylash (merge — eskisi saqlanadi)
+        var results = FIXTURES.filter(function(f) { return f.homeScore !== null; }).length;
+        var koN = Object.keys(koResults).length;
+        if (sources.length) {
+          setApi('ok', sources.join('+') + ' · ' + results + (koN ? '+' + koN : '') + ' natija');
+        } else {
+          setApi('err', 'API xatosi');
+          showToast("API ga ulanib bo'lmadi", true);
+        }
+        buildScorerTotals();
+        renderAll();
+        if (curPage === 'groups') renderGroups();
+        if (curPage === 'thirdplace') renderThird();
+        if (curPage === 'matches') renderMatches();
+        if (curPage === 'scorers') renderScorers();
+        if (curPage === 'rules') renderBracket();
+        if (curPage === 'chances') renderChances();
+        if (curPage === 'playoff') renderPlayoff();
+        loadAllScorers();
+      } catch (e) {}
+    })
+    .catch(function() {})
+    .then(function() { apiLoading = false; }); // har doim tiklanadi (render xato bersa ham)
 }
 
 function loadAllScorers() {
@@ -1099,15 +1141,23 @@ function isOwnGoal(type) {
 
 function buildScorerTotals() {
   allScorers = {};
+  function add(name, team, type) {
+    if (!name || isOwnGoal(type)) return;
+    if (!allScorers[name]) allScorers[name] = { name: name, team: team, goals: 0 };
+    allScorers[name].goals++;
+  }
+  // Guruh bosqichi gollari
   FIXTURES.forEach(function(f) {
     if (f.homeScore === null) return;
-    var goals = f.homeScorers.map(function(s) { return {name:s.name,team:f.home,type:s.type}; })
-      .concat(f.awayScorers.map(function(s) { return {name:s.name,team:f.away,type:s.type}; }));
-    goals.forEach(function(g) {
-      if (!g.name || isOwnGoal(g.type)) return;
-      if (!allScorers[g.name]) allScorers[g.name] = { name: g.name, team: g.team, goals: 0 };
-      allScorers[g.name].goals++;
-    });
+    f.homeScorers.forEach(function(s) { add(s.name, f.home, s.type); });
+    f.awayScorers.forEach(function(s) { add(s.name, f.away, s.type); });
+  });
+  // Pley-off (chiqaruv bosqichi) gollari ham qo'shiladi
+  Object.keys(koResults).forEach(function(mm) {
+    var r = koResults[mm]; if (!r || !r.done) return;
+    var t = koTeams(mm); if (!t || !t.home || !t.away) return;
+    (r.homeScorers || []).forEach(function(s) { add(s.name, t.home, s.type); });
+    (r.awayScorers || []).forEach(function(s) { add(s.name, t.away, s.type); });
   });
 }
 
@@ -1150,25 +1200,65 @@ function h2hMini(names) {
   return t;
 }
 
-// FIFA 2026 guruh tartibi mezonlari (Modda 13):
-//  1) ochkolar  2) o'zaro o'yin ochkolari  3) o'zaro gol farqi
-//  4) o'zaro urilgan gollar  5) umumiy gol farqi  6) umumiy urilgan gol
-//  (keyin fair-play va FIFA reytingi — bu yerda hisoblanmaydi)
-function sortGroupTeams(arr) {
-  return arr.slice().sort(function(a, b) {
-    if (b.pts !== a.pts) return b.pts - a.pts;
-    var tied = arr.filter(function(x) { return x.pts === a.pts; });
-    if (tied.length > 1 && tied.length < arr.length) {
-      var mini = h2hMini(tied.map(function(x) { return x.name; }));
-      var ma = mini[a.name], mb = mini[b.name];
-      if (mb.pts !== ma.pts) return mb.pts - ma.pts;
-      if (mb.gd !== ma.gd) return mb.gd - ma.gd;
-      if (mb.gf !== ma.gf) return mb.gf - ma.gf;
-    }
-    if (b.gd !== a.gd) return b.gd - a.gd;
-    if (b.gf !== a.gf) return b.gf - a.gf;
-    return a.name.localeCompare(b.name);
+// O'zaro o'yin mini-jadvali berilgan o'yinlar ro'yxatidan (simulyatsiya uchun)
+function h2hFromGames(names, games) {
+  var t = {};
+  names.forEach(function(n) { t[n] = { pts: 0, gd: 0, gf: 0 }; });
+  games.forEach(function(m) {
+    if (names.indexOf(m[0]) < 0 || names.indexOf(m[1]) < 0) return;
+    var H = t[m[0]], A = t[m[1]]; if (!H || !A) return;
+    H.gf += m[2]; H.gd += m[2] - m[3]; A.gf += m[3]; A.gd += m[3] - m[2];
+    if (m[2] > m[3]) H.pts += 3; else if (m[2] < m[3]) A.pts += 3; else { H.pts++; A.pts++; }
   });
+  return t;
+}
+
+// FIFA 2026 guruh tartibi mezonlari (Modda 13):
+//  1) ochkolar  2) o'zaro ochko  3) o'zaro gol farqi  4) o'zaro urilgan gol
+//  — 2-4 hali ajratmasa, tenglikda qolgan KICHIK to'plamga QAYTA qo'llanadi —
+//  keyin 5) umumiy gol farqi  6) umumiy urilgan gol  7) fair-play  8) FIFA reytingi.
+// nameOf: jamoa nomini oladi; h2hFn(names): o'zaro mini-jadval; finalCmp: oxirgi mezon.
+function orderTeams(arr, nameOf, h2hFn, finalCmp) {
+  function overall(block) {
+    return block.slice().sort(function(a, b) { return b.gd - a.gd || b.gf - a.gf || finalCmp(a, b); });
+  }
+  function tiedH2H(block) {
+    if (block.length === 1) return block;
+    var mini = h2hFn(block.map(nameOf));
+    var sorted = block.slice().sort(function(a, b) {
+      var ma = mini[nameOf(a)], mb = mini[nameOf(b)];
+      return mb.pts - ma.pts || mb.gd - ma.gd || mb.gf - ma.gf;
+    });
+    var subs = [], i = 0;
+    while (i < sorted.length) {
+      var j = i, mi = mini[nameOf(sorted[i])];
+      while (j < sorted.length) {
+        var mj = mini[nameOf(sorted[j])];
+        if (mj.pts !== mi.pts || mj.gd !== mi.gd || mj.gf !== mi.gf) break;
+        j++;
+      }
+      subs.push(sorted.slice(i, j)); i = j;
+    }
+    if (subs.length === 1) return overall(block); // butun to'plam h2h da teng → umumiy
+    var out = [];
+    subs.forEach(function(s) { out = out.concat(s.length === 1 ? s : tiedH2H(s)); }); // qayta qo'llash
+    return out;
+  }
+  var byPts = arr.slice().sort(function(a, b) { return b.pts - a.pts; });
+  var res = [], k = 0;
+  while (k < byPts.length) {
+    var j = k;
+    while (j < byPts.length && byPts[j].pts === byPts[k].pts) j++;
+    var block = byPts.slice(k, j);
+    res = res.concat(block.length === 1 ? block : tiedH2H(block));
+    k = j;
+  }
+  return res;
+}
+
+function sortGroupTeams(arr) {
+  return orderTeams(arr, function(x) { return x.name; }, h2hMini,
+    function(a, b) { return (fifaRank(a.name) - fifaRank(b.name)) || a.name.localeCompare(b.name); });
 }
 
 function standings(group) {
@@ -1199,8 +1289,10 @@ function thirdPlaceRanking() {
     var third = standings(g)[2];
     return Object.assign({}, third, { group: g, groupDone: groupPlayed(g) === 6 });
   });
+  // pts → gd → gf → (fair-play, hisoblanmaydi) → FIFA jahon reytingi → guruh harfi
   arr.sort(function(a, b) {
-    return b.pts - a.pts || b.gd - a.gd || b.gf - a.gf || a.group.localeCompare(b.group);
+    return b.pts - a.pts || b.gd - a.gd || b.gf - a.gf
+      || (fifaRank(a.name) - fifaRank(b.name)) || a.group.localeCompare(b.group);
   });
   return arr;
 }
@@ -1353,6 +1445,7 @@ function thirdAdvanceStatus() {
 // FIFA reytingi — oxirgi tay-brek mezoni (11-iyun 2026 rasmiy)
 // ═══════════════════════════════════════════════════
 var MY_TEAM = 'Uzbekistan';
+var _mcCache = { sig: null, val: null }; // Monte-Karlo keshi (natijalar o'zgarmasa qayta hisoblamaymiz)
 var FIFA_RANK = {
   'Argentina':1,'Spain':2,'France':3,'England':4,'Portugal':5,'Brazil':6,'Morocco':7,
   'Netherlands':8,'Belgium':9,'Germany':10,'Croatia':11,'Colombia':13,'Mexico':14,
@@ -1387,25 +1480,10 @@ function rankSim(teams, games) {
     if(m[2]>m[3])h.pts+=3; else if(m[2]<m[3])a.pts+=3; else {h.pts++;a.pts++;}
   });
   var arr = Object.keys(t).map(function(n){ var x=t[n]; x.gd=x.gf-x.ga; return x; });
-  arr.sort(function(a,b){
-    if(b.pts!==a.pts)return b.pts-a.pts;
-    var tied=arr.filter(function(z){return z.pts===a.pts;}).map(function(z){return z.n;});
-    if(tied.length>1&&tied.length<arr.length){
-      var h={}; tied.forEach(function(n){h[n]={pts:0,gd:0,gf:0};});
-      games.forEach(function(m){
-        if(tied.indexOf(m[0])<0||tied.indexOf(m[1])<0)return;
-        var H=h[m[0]],A=h[m[1]];H.gf+=m[2];H.gd+=m[2]-m[3];A.gf+=m[3];A.gd+=m[3]-m[2];
-        if(m[2]>m[3])H.pts+=3;else if(m[2]<m[3])A.pts+=3;else{H.pts++;A.pts++;}
-      });
-      if(h[b.n].pts!==h[a.n].pts)return h[b.n].pts-h[a.n].pts;
-      if(h[b.n].gd!==h[a.n].gd)return h[b.n].gd-h[a.n].gd;
-      if(h[b.n].gf!==h[a.n].gf)return h[b.n].gf-h[a.n].gf;
-    }
-    if(b.gd!==a.gd)return b.gd-a.gd;
-    if(b.gf!==a.gf)return b.gf-a.gf;
-    return fifaRank(a.n)-fifaRank(b.n);
-  });
-  return arr;
+  // Bir xil FIFA Modda 13 tartibi (o'zaro o'yin qayta qo'llash bilan), oxirgi mezon — FIFA reytingi
+  return orderTeams(arr, function(x){ return x.n; },
+    function(names){ return h2hFromGames(names, games); },
+    function(a,b){ return (fifaRank(a.n) - fifaRank(b.n)) || a.n.localeCompare(b.n); });
 }
 function wdlAll(n) {
   var out=[]; (function rec(i,acc){ if(i===n){out.push(acc.slice());return;}
@@ -1655,37 +1733,41 @@ function fixtureCard(f, showGroup) {
 
 function koMiniCard(x) {
   var pl=(x.r==='R32'&&x.away==='3')?x.pool:false;
-  return '<div class="kocard"><div class="kom">M'+x.m+'</div>'
-    +'<div class="koside h">'+koSide(x.home,x.m,false)+'</div>'
-    +'<div class="kovs">'+koTime(x.utc)+'</div>'
-    +'<div class="koside a">'+koSide(x.away,x.m,pl)+'</div>'
-    +'<div class="kodate">'+koWhen(x.utc)+'</div></div>';
+  var rr=koResults[x.m], pld=rr&&rr.done, wn=pld?koWinner(x.m):null;
+  var ht=resolveSlot(x.home,x.m), at=resolveSlot(x.away,x.m);
+  var mid = pld
+    ? '<span class="koscore">'+rr.hs+'–'+rr.as+(rr.ph!=null?' <i>('+rr.ph+'-'+rr.pa+' pen)</i>':(rr.aet?' <i>(q.v.)</i>':''))+'</span>'
+    : koTime(x.utc);
+  return '<div class="kocard'+(pld?' played':'')+'"><div class="kom">M'+x.m+'</div>'
+    +'<div class="koside h'+(wn&&wn===ht?' win':'')+'">'+koSide(x.home,x.m,false)+'</div>'
+    +'<div class="kovs">'+mid+'</div>'
+    +'<div class="koside a'+(wn&&wn===at?' win':'')+'">'+koSide(x.away,x.m,pl)+'</div>'
+    +'<div class="kodate">'+koDateLabel(x.date)+'</div></div>';
 }
 
 function renderOverviewLists() {
-  var upcoming = FIXTURES
-    .filter(function(f) { return f.homeScore === null; })
-    .sort(function(a,b) { return a.utc.localeCompare(b.utc); })
-    .slice(0, 6);
-  var upHtml;
-  if (upcoming.length) {
-    upHtml = upcoming.map(function(f) { return fixtureCard(f, true); }).join('');
-  } else if (allGroupsDone()) {
-    // Guruh bosqichi tugadi — pley-off (1/16 final) o'yinlarini ko'rsatamiz
-    var ko = koAllMatches().filter(function(x){ return x.r==='R32'; }).slice(0, 6);
-    upHtml = '<div class="note" style="margin-bottom:.6rem">✅ Guruh bosqichi tugadi — pley-off boshlanmoqda. '
-      + 'To\'liq jadval <b>Pley-off</b> sahifasida.</div>' + ko.map(koMiniCard).join('');
-  } else {
-    upHtml = '<div class="empty"><div class="eic">✅</div>Barcha o\'yinlar o\'ynaldi!</div>';
-  }
-  document.getElementById('upcoming-list').innerHTML = upHtml;
+  var ko = koAllMatches();
+  var koDone = allGroupsDone();
+  // Yaqinlashayotgan: o'ynalmagan guruh o'yinlari + (guruh tugagach) o'ynalmagan pley-off
+  var groupUp = FIXTURES.filter(function(f){ return f.homeScore===null; })
+    .map(function(f){ return { utc:f.utc, html:fixtureCard(f,true) }; });
+  var koUp = (koDone ? ko.filter(function(x){ var r=koResults[x.m]; return !(r&&r.done); }) : [])
+    .map(function(x){ return { utc:x.utc, html:koMiniCard(x) }; });
+  var up = groupUp.concat(koUp).sort(function(a,b){ return a.utc.localeCompare(b.utc); }).slice(0, 6);
+  var note = (koDone && !groupUp.length)
+    ? '<div class="note" style="margin-bottom:.6rem">✅ Guruh bosqichi tugadi — pley-off. To\'liq jadval <b>Pley-off</b> sahifasida.</div>' : '';
+  document.getElementById('upcoming-list').innerHTML = up.length
+    ? note + up.map(function(c){ return c.html; }).join('')
+    : '<div class="empty"><div class="eic">🏆</div>Turnir yakunlandi!</div>';
 
-  var recent = FIXTURES
-    .filter(function(f) { return f.homeScore !== null; })
-    .sort(function(a,b) { return b.utc.localeCompare(a.utc); })
-    .slice(0, 6);
-  document.getElementById('recent-list').innerHTML = recent.length
-    ? recent.map(function(f) { return fixtureCard(f, true); }).join('')
+  // Oxirgi natijalar: o'ynalgan guruh o'yinlari + o'ynalgan pley-off (eng yangisi tepada)
+  var groupRec = FIXTURES.filter(function(f){ return f.homeScore!==null; })
+    .map(function(f){ return { utc:f.utc, html:fixtureCard(f,true) }; });
+  var koRec = ko.filter(function(x){ var r=koResults[x.m]; return r&&r.done; })
+    .map(function(x){ return { utc:x.utc, html:koMiniCard(x) }; });
+  var rec = groupRec.concat(koRec).sort(function(a,b){ return b.utc.localeCompare(a.utc); }).slice(0, 6);
+  document.getElementById('recent-list').innerHTML = rec.length
+    ? rec.map(function(c){ return c.html; }).join('')
     : '<div class="empty"><div class="eic">📅</div>Turnir 11-iyun 2026 boshlanadi</div>';
 }
 
@@ -1832,26 +1914,30 @@ function renderThird() {
 
 // 1/16 final to'rlari (FIFA rasmiy jadvali, M73–M88).
 // 'home'/'away': "1A"=guruh A g'olibi, "2B"=guruh B 2-o'rin, "3"=eng yaxshi 3-o'rin (pool — manba guruhlar)
+// FIFA rasmiy jadvali. 'date' = rasmiy o'yin kuni (mezbon/ET taqvimi) — bu ko'rsatiladi;
+// 'utc' = boshlanish lahzasi — soat foydalanuvchining mahalliy vaqtida ko'rsatiladi.
 var R32 = [
-  { m: 73, utc:'2026-06-28T23:00:00Z', home: '2A', away: '2B', pool: null },
-  { m: 74, utc:'2026-06-29T17:00:00Z', home: '1E', away: '3', pool: 'A/B/C/D/F' },
-  { m: 75, utc:'2026-06-29T20:00:00Z', home: '1F', away: '2C', pool: null },
-  { m: 76, utc:'2026-06-29T23:00:00Z', home: '1C', away: '2F', pool: null },
-  { m: 77, utc:'2026-06-30T16:00:00Z', home: '1I', away: '3', pool: 'C/D/F/G/H' },
-  { m: 78, utc:'2026-06-30T19:00:00Z', home: '2E', away: '2I', pool: null },
-  { m: 79, utc:'2026-06-30T22:00:00Z', home: '1A', away: '3', pool: 'C/E/F/H/I' },
-  { m: 80, utc:'2026-07-01T01:00:00Z', home: '1L', away: '3', pool: 'E/H/I/J/K' },
-  { m: 81, utc:'2026-07-01T16:00:00Z', home: '1D', away: '3', pool: 'B/E/F/I/J' },
-  { m: 82, utc:'2026-07-01T19:00:00Z', home: '1G', away: '3', pool: 'A/E/H/I/J' },
-  { m: 83, utc:'2026-07-01T22:00:00Z', home: '2K', away: '2L', pool: null },
-  { m: 84, utc:'2026-07-02T01:00:00Z', home: '1H', away: '2J', pool: null },
-  { m: 85, utc:'2026-07-02T16:00:00Z', home: '1B', away: '3', pool: 'E/F/G/I/J' },
-  { m: 86, utc:'2026-07-02T19:00:00Z', home: '1J', away: '2H', pool: null },
-  { m: 87, utc:'2026-07-02T22:00:00Z', home: '1K', away: '3', pool: 'D/E/I/J/L' },
-  { m: 88, utc:'2026-07-03T01:00:00Z', home: '2D', away: '2G', pool: null }
+  { m: 73, date:'2026-06-28', utc:'2026-06-28T16:00:00Z', home:'2A', away:'2B', pool:null,        venue:'SoFi Stadium, Los Angeles' },
+  { m: 74, date:'2026-06-29', utc:'2026-06-29T17:00:00Z', home:'1E', away:'3',  pool:'A/B/C/D/F',  venue:'NRG Stadium, Houston' },
+  { m: 75, date:'2026-06-29', utc:'2026-06-29T20:30:00Z', home:'1F', away:'2C', pool:null,        venue:'Gillette Stadium, Boston' },
+  { m: 76, date:'2026-06-29', utc:'2026-06-30T01:00:00Z', home:'1C', away:'2F', pool:null,        venue:'Estadio BBVA, Monterrey' },
+  { m: 77, date:'2026-06-30', utc:'2026-06-30T21:00:00Z', home:'1I', away:'3',  pool:'C/D/F/G/H',  venue:'MetLife Stadium, New York/NJ' },
+  { m: 78, date:'2026-06-30', utc:'2026-06-30T17:00:00Z', home:'2E', away:'2I', pool:null,        venue:'AT&T Stadium, Dallas' },
+  { m: 79, date:'2026-06-30', utc:'2026-07-01T01:00:00Z', home:'1A', away:'3',  pool:'C/E/F/H/I',  venue:'Estadio Azteca, Mexico City' },
+  { m: 80, date:'2026-07-01', utc:'2026-07-01T16:00:00Z', home:'1L', away:'3',  pool:'E/H/I/J/K',  venue:'Mercedes-Benz Stadium, Atlanta' },
+  { m: 81, date:'2026-07-01', utc:'2026-07-02T00:00:00Z', home:'1D', away:'3',  pool:'B/E/F/I/J',  venue:"Levi's Stadium, San Francisco Bay" },
+  { m: 82, date:'2026-07-01', utc:'2026-07-01T20:00:00Z', home:'1G', away:'3',  pool:'A/E/H/I/J',  venue:'Lumen Field, Seattle' },
+  { m: 83, date:'2026-07-02', utc:'2026-07-02T23:00:00Z', home:'2K', away:'2L', pool:null,        venue:'BMO Field, Toronto' },
+  { m: 84, date:'2026-07-02', utc:'2026-07-02T19:00:00Z', home:'1H', away:'2J', pool:null,        venue:'SoFi Stadium, Los Angeles' },
+  { m: 85, date:'2026-07-02', utc:'2026-07-03T03:00:00Z', home:'1B', away:'3',  pool:'E/F/G/I/J',  venue:'BC Place, Vancouver' },
+  { m: 86, date:'2026-07-03', utc:'2026-07-03T22:00:00Z', home:'1J', away:'2H', pool:null,        venue:'Hard Rock Stadium, Miami' },
+  { m: 87, date:'2026-07-03', utc:'2026-07-04T01:30:00Z', home:'1K', away:'3',  pool:'D/E/I/J/L',  venue:'Arrowhead Stadium, Kansas City' },
+  { m: 88, date:'2026-07-03', utc:'2026-07-03T18:00:00Z', home:'2D', away:'2G', pool:null,        venue:'AT&T Stadium, Dallas' }
 ];
 var UZMON = ['yanv','fevr','mart','apr','may','iyun','iyul','avg','sent','okt','noy','dek'];
-function koWhen(utc){ if(!utc) return ''; var d=new Date(utc); return pad2(d.getDate())+'-'+UZMON[d.getMonth()]; }
+// Rasmiy o'yin kunini ('YYYY-MM-DD') "kun-oy" ko'rinishida (mintaqadan mustaqil)
+function koDateLabel(dstr){ if(!dstr) return ''; var p=String(dstr).split('-');
+  return String(parseInt(p[2],10))+'-'+UZMON[parseInt(p[1],10)-1]; }
 function koTime(utc){ if(!utc) return ''; var d=new Date(utc); return pad2(d.getHours())+':'+pad2(d.getMinutes()); }
 
 // "1A"/"2B" kabi slotni jamoa nomiga aylantiradi (guruh tugagan bo'lsa)
@@ -1874,7 +1960,7 @@ function renderBracket() {
       : slotTeam(x.away);
     return '<div class="kr">'
       + '<div class="kstage">' + slotTeam(x.home) + ' <span style="color:var(--muted)">—</span> ' + away + '</div>'
-      + '<div class="kdate">' + koWhen(x.utc) + ' ' + koTime(x.utc) + '</div>'
+      + '<div class="kdate">' + koDateLabel(x.date) + ' ' + koTime(x.utc) + '</div>'
       + '<div class="kn">M' + x.m + '</div>'
       + '</div>';
   }).join('');
@@ -1884,22 +1970,22 @@ function renderBracket() {
 // PLEY-OFF (to'liq chiqaruv bosqichi, M73–M104)
 // ═══════════════════════════════════════════════════
 var KO_LATER = [
-  { m:89, r:'R16', utc:'2026-07-04T17:00:00Z', home:'W74', away:'W77' },
-  { m:90, r:'R16', utc:'2026-07-04T20:00:00Z', home:'W73', away:'W75' },
-  { m:91, r:'R16', utc:'2026-07-05T17:00:00Z', home:'W76', away:'W78' },
-  { m:92, r:'R16', utc:'2026-07-05T20:00:00Z', home:'W79', away:'W80' },
-  { m:93, r:'R16', utc:'2026-07-06T17:00:00Z', home:'W83', away:'W84' },
-  { m:94, r:'R16', utc:'2026-07-06T20:00:00Z', home:'W81', away:'W82' },
-  { m:95, r:'R16', utc:'2026-07-07T17:00:00Z', home:'W86', away:'W88' },
-  { m:96, r:'R16', utc:'2026-07-07T20:00:00Z', home:'W85', away:'W87' },
-  { m:97, r:'QF',  utc:'2026-07-09T20:00:00Z', home:'W89', away:'W90' },
-  { m:98, r:'QF',  utc:'2026-07-10T20:00:00Z', home:'W93', away:'W94' },
-  { m:99, r:'QF',  utc:'2026-07-10T23:00:00Z', home:'W91', away:'W92' },
-  { m:100,r:'QF',  utc:'2026-07-11T20:00:00Z', home:'W95', away:'W96' },
-  { m:101,r:'SF',  utc:'2026-07-14T23:00:00Z', venue:'Dallas', home:'W97', away:'W98' },
-  { m:102,r:'SF',  utc:'2026-07-15T23:00:00Z', venue:'Atlanta', home:'W99', away:'W100' },
-  { m:103,r:'3RD', utc:'2026-07-18T20:00:00Z', venue:'Miami', home:'L101', away:'L102' },
-  { m:104,r:'FIN', utc:'2026-07-19T19:00:00Z', venue:'New York/NJ', home:'W101', away:'W102' }
+  { m:89, r:'R16', date:'2026-07-04', utc:'2026-07-04T21:00:00Z', home:'W74', away:'W77',  venue:'Lincoln Financial Field, Philadelphia' },
+  { m:90, r:'R16', date:'2026-07-04', utc:'2026-07-04T17:00:00Z', home:'W73', away:'W75',  venue:'NRG Stadium, Houston' },
+  { m:91, r:'R16', date:'2026-07-05', utc:'2026-07-05T20:00:00Z', home:'W76', away:'W78',  venue:'MetLife Stadium, New York/NJ' },
+  { m:92, r:'R16', date:'2026-07-05', utc:'2026-07-06T00:00:00Z', home:'W79', away:'W80',  venue:'Estadio Azteca, Mexico City' },
+  { m:93, r:'R16', date:'2026-07-06', utc:'2026-07-06T19:00:00Z', home:'W83', away:'W84',  venue:'AT&T Stadium, Dallas' },
+  { m:94, r:'R16', date:'2026-07-06', utc:'2026-07-07T00:00:00Z', home:'W81', away:'W82',  venue:'Lumen Field, Seattle' },
+  { m:95, r:'R16', date:'2026-07-07', utc:'2026-07-07T16:00:00Z', home:'W86', away:'W88',  venue:'Mercedes-Benz Stadium, Atlanta' },
+  { m:96, r:'R16', date:'2026-07-07', utc:'2026-07-07T20:00:00Z', home:'W85', away:'W87',  venue:'BC Place, Vancouver' },
+  { m:97, r:'QF',  date:'2026-07-09', utc:'2026-07-09T20:00:00Z', home:'W89', away:'W90',  venue:'Gillette Stadium, Boston' },
+  { m:98, r:'QF',  date:'2026-07-10', utc:'2026-07-10T19:00:00Z', home:'W93', away:'W94',  venue:'SoFi Stadium, Los Angeles' },
+  { m:99, r:'QF',  date:'2026-07-11', utc:'2026-07-11T21:00:00Z', home:'W91', away:'W92',  venue:'Hard Rock Stadium, Miami' },
+  { m:100,r:'QF',  date:'2026-07-11', utc:'2026-07-12T01:00:00Z', home:'W95', away:'W96',  venue:'Arrowhead Stadium, Kansas City' },
+  { m:101,r:'SF',  date:'2026-07-14', utc:'2026-07-14T19:00:00Z', home:'W97', away:'W98',  venue:'AT&T Stadium, Dallas' },
+  { m:102,r:'SF',  date:'2026-07-15', utc:'2026-07-15T19:00:00Z', home:'W99', away:'W100', venue:'Mercedes-Benz Stadium, Atlanta' },
+  { m:103,r:'3RD', date:'2026-07-18', utc:'2026-07-18T21:00:00Z', home:'L101', away:'L102', venue:'Hard Rock Stadium, Miami' },
+  { m:104,r:'FIN', date:'2026-07-19', utc:'2026-07-19T19:00:00Z', home:'W101', away:'W102', venue:'MetLife Stadium, New York/NJ' }
 ];
 // Setka (bracket) — har bosqich o'yinlari ustma-ust tartibда (yuqoridan pastga)
 var BR_ROUNDS = [
@@ -1976,13 +2062,12 @@ function thirdTeamForMatch(m) {
 // ═══════════════════════════════════════════════════
 // JONLI PLEY-OFF — manbalardan natijalar, g'olib keyingi bosqichga o'tadi
 // ═══════════════════════════════════════════════════
-var KO_GUARD = '2026-06-28';   // shu sanadan keyingi o'yinlar — pley-off (guruh emas)
-var koResults = {};            // matchNum -> {hs,as,ph,pa,done}
+var koResults = {};            // matchNum -> {hs,as,ph,pa,aet,decisive,done,homeScorers,awayScorers}
 var _koEv = [];                // manbalardan yig'ilgan pley-off natijalari
 var _koByNum = null;
 
 function koAllMatches() {
-  return R32.map(function(x){ return {m:x.m, r:'R32', utc:x.utc, home:x.home, away:x.away, pool:x.pool, venue:x.venue}; })
+  return R32.map(function(x){ return {m:x.m, r:'R32', date:x.date, utc:x.utc, home:x.home, away:x.away, pool:x.pool, venue:x.venue}; })
     .concat(KO_LATER);
 }
 function koByNum() { if(!_koByNum){ _koByNum={}; koAllMatches().forEach(function(x){ _koByNum[x.m]=x; }); } return _koByNum; }
@@ -2003,9 +2088,10 @@ function koWinner(m) { var r=koResults[m]; if(!r||!r.done) return null; var t=ko
 function koLoser(m) { var w=koWinner(m); if(!w) return null; var t=koTeams(m); if(!t) return null;
   return w===t.home?t.away:t.home; }
 
-function pushKO(h,a,hs,as,ph,pa) {
+function pushKO(h,a,hs,as,ph,pa,aet,hsc,asc) {
   if(!h||!a||typeof hs!=='number'||typeof as!=='number') return;
-  _koEv.push({ h:h, a:a, hs:hs, as:as, ph:(typeof ph==='number'?ph:null), pa:(typeof pa==='number'?pa:null) });
+  _koEv.push({ h:h, a:a, hs:hs, as:as, ph:(typeof ph==='number'?ph:null), pa:(typeof pa==='number'?pa:null),
+    aet:!!aet, hsc:hsc||[], asc:asc||[] });
 }
 function ofKoRound(r) { r=String(r||'').toLowerCase();
   if(r.indexOf('third')>=0||r.indexOf('3rd')>=0) return '3RD';
@@ -2016,24 +2102,31 @@ function ofKoRound(r) { r=String(r||'').toLowerCase();
   if(r.indexOf('final')>=0) return 'FIN';
   return null;
 }
-// Yig'ilgan natijalarni setkaga joylash — bosqichма-bosqich (fikspoint), jamoa juftligi bo'yicha
+// Yig'ilgan natijalarni setkaga JOYLAYDI (merge — eskisini o'chirmaydi, shuning uchun
+// bitta muvaffaqiyatsiz yangilanish setkani tozalamaydi). Bosqichма-bosqich (fikspoint),
+// jamoa juftligi bo'yicha. Aniq natijani noaniqga tushirmaydi.
 function ingestKO(evs) {
-  koResults = {};
   var all = koAllMatches(), assigned = [];
-  for(var pass=0; pass<6; pass++){
+  for(var pass=0; pass<7; pass++){
     var changed=false;
     for(var ei=0; ei<evs.length; ei++){
       if(assigned[ei]) continue;
       var e=evs[ei], eh=normTeam(e.h), ea=normTeam(e.a);
       if(!eh||!ea){ assigned[ei]=true; continue; }
       for(var i=0;i<all.length;i++){ var m=all[i].m;
-        if(koResults[m]) continue;
         var rt=koTeams(m); if(!rt||!rt.home||!rt.away) continue;
         var rh=normTeam(rt.home), ra=normTeam(rt.away);
         if((rh===eh&&ra===ea)||(rh===ea&&ra===eh)){
           var sw=(rh===ea);
-          koResults[m]={ hs: sw?e.as:e.hs, as: sw?e.hs:e.as, ph: sw?e.pa:e.ph, pa: sw?e.ph:e.pa, done:true };
-          assigned[ei]=true; changed=true; break;
+          var hs=sw?e.as:e.hs, as=sw?e.hs:e.as, ph=sw?e.pa:e.ph, pa=sw?e.ph:e.pa;
+          var decisive=(hs!==as)||(ph!=null&&pa!=null);
+          var prev=koResults[m];
+          if(prev && prev.decisive && !decisive){ assigned[ei]=true; break; } // aniqni tushirmaymiz
+          koResults[m]={ hs:hs, as:as, ph:ph, pa:pa, aet:!!e.aet, decisive:decisive, done:true,
+            homeScorers: sw?(e.asc||[]):(e.hsc||[]), awayScorers: sw?(e.hsc||[]):(e.asc||[]) };
+          assigned[ei]=true;
+          if(decisive && !(prev && prev.decisive)) changed=true; // yangi g'olib → keyingi bosqichni ochadi
+          break;
         }
       }
     }
@@ -2077,7 +2170,7 @@ function renderBracketTree() {
         +'<span class="smn">M'+m+'</span>'
         +'<div class="ss'+(wn&&wn===ht?' win':'')+'">'+bracketSide(mt.home,m,false)+hsc+'</div>'
         +'<div class="ss'+(wn&&wn===at?' win':'')+'">'+bracketSide(mt.away,m,pl)+asc+'</div>'
-        +'<div class="smt">'+(pld?'tugadi':koTime(mt.utc))+'</div></div>';
+        +'<div class="smt">'+(pld?(rr.ph!=null?'pen':(rr.aet?'q.v.':'tugadi')):koTime(mt.utc))+'</div></div>';
     });
   });
   BR_ROUNDS.forEach(function(col,r){
@@ -2116,15 +2209,16 @@ function renderPlayoff() {
       var pl=(x.r==='R32'&&x.away==='3')?x.pool:false;
       var rr=koResults[x.m], pld=rr&&rr.done, wn=pld?koWinner(x.m):null;
       var ht=resolveSlot(x.home,x.m), at=resolveSlot(x.away,x.m);
+      var extra = pld ? (rr.ph!=null ? ' <i>('+rr.ph+'-'+rr.pa+' pen)</i>' : (rr.aet ? ' <i>(q.v.)</i>' : '')) : '';
       var mid = pld
-        ? '<span class="koscore">'+rr.hs+'–'+rr.as+(rr.ph!=null?' <i>('+rr.ph+'-'+rr.pa+'p)</i>':'')+'</span>'
+        ? '<span class="koscore">'+rr.hs+'–'+rr.as+extra+'</span>'
         : koTime(x.utc);
       html+='<div class="kocard'+(rd[0]==='FIN'?' fin':'')+(pld?' played':'')+'">'
         + '<div class="kom">M'+x.m+'</div>'
         + '<div class="koside h'+(wn&&wn===ht?' win':'')+'">'+koSide(x.home,x.m,false)+'</div>'
         + '<div class="kovs">'+mid+'</div>'
         + '<div class="koside a'+(wn&&wn===at?' win':'')+'">'+koSide(x.away,x.m,pl)+'</div>'
-        + '<div class="kodate">'+koWhen(x.utc)+(x.venue?' · '+esc(x.venue):'')+'</div>'
+        + '<div class="kodate">'+koDateLabel(x.date)+(x.venue?' · '+esc(x.venue):'')+'</div>'
         + '</div>';
     });
     html+='</div></div>';
@@ -2213,7 +2307,13 @@ function renderChances() {
   var o=A.own, oppMatch=o.ownMatch;
   var opp = oppMatch ? (oppMatch[0]===MY_TEAM?oppMatch[1]:oppMatch[0]) : null;
   var alive = (A.verdict==='alive-third'||A.verdict==='alive-top2');
-  var mc=null; if(alive){ try{ mc=simChances(MY_TEAM,4000); }catch(e){} }
+  // Monte-Karlo qimmat — natijalar o'zgarmagan bo'lsa keshdan olamiz (har 3 daq. qayta hisoblamaymiz)
+  var mc=null;
+  if(alive){
+    var sig = FIXTURES.map(function(f){ return f.homeScore===null?'-':(f.homeScore+':'+f.awayScore); }).join(',');
+    if(_mcCache.sig === sig) mc = _mcCache.val;
+    else { try{ mc=simChances(MY_TEAM,4000); }catch(e){ mc=null; } _mcCache.sig=sig; _mcCache.val=mc; }
+  }
   function pct(x){ return x.toFixed(x<10?1:0)+'%'; }
 
   var vmap={

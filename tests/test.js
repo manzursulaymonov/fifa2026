@@ -627,6 +627,23 @@ check('shortName boshqa nomlarni o\'zgartirmaydi', sandbox.shortName('Uzbekistan
   check('sahifada "yutadi yoki durang" minimal shart', /yutadi yoki durang/.test(cb));
   check('sahifada gol farqi narvoni va ehtimol', /to'p farqi|gol farqi/.test(cb) && /%/.test(cb));
 
+  // Monte-Karlo keshi: hisob o'zgarmasa qayta hisoblanmaydi (finding #16, perf)
+  let simCalls = 0; const realSimChances = sandbox.simChances;
+  sandbox.simChances = function() { simCalls++; return realSimChances.apply(this, arguments); };
+  sandbox._mcCache = { sig: null, val: null };
+  sandbox.renderChances(); // miss (Uzbekistan hali TIRIK) → simChances chaqiriladi
+  const mcSig = FIXTURES.map(f => f.homeScore === null ? '-' : (f.homeScore + ':' + f.awayScore)).join(',');
+  const callsA = simCalls;
+  check('Monte-Karlo: alive holatda simChances chaqirildi', callsA >= 1);
+  check('Monte-Karlo kesh imzosi FIXTURES hisobiga mos', sandbox._mcCache.sig === mcSig);
+  sandbox.renderChances(); // hit — hisob o'zgarmadi → qayta chaqirilmaydi
+  check('Monte-Karlo keshi: imzo o\'zgarmasa qayta hisoblanmaydi', simCalls === callsA);
+  sandbox._mcCache.sig = 'FORCE-DIFF'; // imzo farqli → qayta hisob
+  sandbox.renderChances();
+  check('Monte-Karlo keshi: imzo o\'zgarsa qayta hisoblanadi',
+    simCalls === callsA + 1 && sandbox._mcCache.sig === mcSig);
+  sandbox.simChances = realSimChances;
+
   console.log('\n[27] Pley-off — yakuniy holat (barcha 72 o\'yin tugagan)');
   // [26] dan keyin MD3 natijalarini qo'shamiz (yakuniy holat)
   setM('Czechia','Mexico',0,3); setM('South Africa','South Korea',1,0);
@@ -662,7 +679,7 @@ check('shortName boshqa nomlarni o\'zgartirmaydi', sandbox.shortName('Uzbekistan
   check('pley-off: vizual setka (svg + chiziqlar)', /<svg class="brksvg"/.test(pb) && /<line /.test(pb));
   check('pley-off: o\'yin soatlari ko\'rsatilgan', /\d\d:\d\d/.test(pb));
   check('koTime mahalliy vaqt formati (HH:MM)', /^\d\d:\d\d$/.test(sandbox.koTime('2026-06-29T17:00:00Z')));
-  check('koWhen sana (kun-oy)', /^\d\d?-\w+$/.test(sandbox.koWhen('2026-06-29T17:00:00Z')));
+  check('koDateLabel rasmiy o\'yin kuni (kun-oy)', sandbox.koDateLabel('2026-06-29') === '29-iyun');
 
   // 3-o'rin sahifasi yakuniy
   sandbox.renderThird();
@@ -708,6 +725,162 @@ check('shortName boshqa nomlarni o\'zgartirmaydi', sandbox.shortName('Uzbekistan
   ]});
   check('applyOpenfootball: faqat KO yig\'iladi (guruh emas)',
     sandbox._koEv.length===1 && sandbox._koEv[0].h==='Germany');
+
+  console.log('\n[29] Chuqur tekshiruv — dates, ET, penalti, to\'purarlar, FIFA tartibi, data-flow');
+  // Bu bo'lim [27]/[28] yakuniy holatidan (barcha 72 o'yin, setka to'lgan) boshlanadi.
+
+  // (1) Pley-off gollari to'purarlarga qo'shiladi (issue #3, findings #5/#13)
+  const koT75 = sandbox.koTeams(75);
+  sandbox.koResults[75] = { hs:2, as:1, ph:null, pa:null, aet:false, decisive:true, done:true,
+    homeScorers:[{name:'KO Tester Bir', type:'Normal Goal'}, {name:'KO Tester Bir', type:'Normal Goal'}],
+    awayScorers:[{name:'KO Tester Ikki', type:'Normal Goal'}, {name:'KO Avtogol', type:'Own Goal'}] };
+  sandbox.buildScorerTotals();
+  check('pley-off goli to\'purarlarga qo\'shildi (2 gol)',
+    sandbox.allScorers['KO Tester Bir'] && sandbox.allScorers['KO Tester Bir'].goals === 2);
+  check('pley-off golida jamoa nomi to\'g\'ri', sandbox.allScorers['KO Tester Bir'] &&
+    sandbox.allScorers['KO Tester Bir'].team === koT75.home);
+  check('pley-off raqib goli ham hisoblanadi',
+    sandbox.allScorers['KO Tester Ikki'] && sandbox.allScorers['KO Tester Ikki'].goals === 1);
+  check('avtogol to\'purarlarga qo\'shilmaydi', !sandbox.allScorers['KO Avtogol']);
+
+  // (2) Qo'shimcha vaqt (ET) — openfootball et hisobini oladi (issue #2)
+  sandbox._koEv = [];
+  sandbox.applyOpenfootball({ matches:[
+    { round:'Quarter-final', team1:'Germany', team2:'France', score:{ ft:[1,1], et:[2,1] } }
+  ]});
+  check('applyOpenfootball: ET hisobi (2-1) va aet bayrog\'i olinadi',
+    sandbox._koEv.length===1 && sandbox._koEv[0].hs===2 && sandbox._koEv[0].as===1 && sandbox._koEv[0].aet===true);
+
+  // (3) Penaltilar (p) olinadi
+  sandbox._koEv = [];
+  sandbox.applyOpenfootball({ matches:[
+    { round:'Round of 16', team1:'Germany', team2:'France', score:{ ft:[1,1], p:[4,2] } }
+  ]});
+  check('applyOpenfootball: penalti hisobi (4-2) olinadi', sandbox._koEv.length===1 &&
+    sandbox._koEv[0].hs===1 && sandbox._koEv[0].as===1 && sandbox._koEv[0].ph===4 && sandbox._koEv[0].pa===2);
+
+  // (4) Durang + penaltisiz => fantom g'olib yo'q; boyroq manba keyin to'ldiradi (issue #2, finding #3)
+  const koT76 = sandbox.koTeams(76);
+  sandbox.ingestKO([{ h:koT76.home, a:koT76.away, hs:1, as:1 }]); // durang, penaltisiz
+  check('durang (penaltisiz) — g\'olib yozilmaydi', sandbox.koWinner(76) === null);
+  check('durang natija done, lekin decisive emas',
+    sandbox.koResults[76] && sandbox.koResults[76].done===true && sandbox.koResults[76].decisive===false);
+  sandbox.ingestKO([{ h:koT76.home, a:koT76.away, hs:1, as:1, ph:5, pa:4 }]); // penalti keldi
+  check('penalti kelgach g\'olib yoziladi (uy egasi)', sandbox.koWinner(76) === koT76.home);
+
+  // (5) ET bilan hal bo'lgan o'yin g'olibi (hisob bo'yicha, aet bayrog'i)
+  const koT78 = sandbox.koTeams(78);
+  sandbox.ingestKO([{ h:koT78.home, a:koT78.away, hs:2, as:1, aet:true }]);
+  check('ET bilan hal bo\'lgan o\'yin g\'olibi (2-1 q.v.)',
+    sandbox.koWinner(78) === koT78.home && sandbox.koResults[78].aet===true);
+
+  // (6) Aniq natijani noaniqga tushirmaydi (merge himoyasi)
+  sandbox.ingestKO([{ h:koT78.home, a:koT78.away, hs:0, as:0 }]); // xato "durang" keldi
+  check('aniq natija noaniqga tushmaydi', sandbox.koWinner(78) === koT78.home);
+
+  // (7) Bo'sh yangilanish natijalarni o'chirmaydi (merge — finding #11)
+  const koCountBefore = Object.keys(sandbox.koResults).length;
+  sandbox.ingestKO([]);
+  check('bo\'sh ingestKO natijalarni saqlaydi', Object.keys(sandbox.koResults).length === koCountBefore && koCountBefore > 0);
+
+  // (8) Guruh/pley-off ajratish: juftlik + sana yaqinligi (finding #1 — Guruh J muzlashi)
+  const jf = FIXTURES.find(f => f.group === 'J');
+  check('groupMatchOf: Guruh J juftligi o\'z sanasida guruh o\'yini',
+    !!sandbox.groupMatchOf(jf.home, jf.away, jf.utc.slice(0,10)));
+  check('groupMatchOf: xuddi shu juftlik uzoq (pley-off) sanada guruh emas',
+    sandbox.groupMatchOf(jf.home, jf.away, '2026-07-10') === null);
+  check('withinDays: ±3 kun ichida true, tashqarida false',
+    sandbox.withinDays('2026-06-28','2026-06-27T18:00:00Z',3) === true &&
+    sandbox.withinDays('2026-07-10','2026-06-27T18:00:00Z',3) === false);
+
+  // (9) Rasmiy o'yin kuni to'g'ridan-to'g'ri 'date' maydonidan (mintaqa siljishisiz — findings #6/#14)
+  check('koDateLabel M76 = 29-iyun (utc 30-iyun bo\'lsa ham drift yo\'q)',
+    sandbox.koDateLabel(sandbox.R32.find(x => x.m===76).date) === '29-iyun');
+  check('koDateLabel M74 = 29-iyun', sandbox.koDateLabel(sandbox.R32.find(x => x.m===74).date) === '29-iyun');
+  check('koDateLabel M104 (final) = 19-iyul',
+    sandbox.koDateLabel(sandbox.KO_LATER.find(x => x.m===104).date) === '19-iyul');
+
+  // (10) Barcha 32 KO o'yinida stadion + rasmiy sana + utc (findings #7/#15)
+  const allKo = sandbox.koAllMatches();
+  check('32 ta KO o\'yini (R32 + keyingi bosqichlar)', allKo.length === 32);
+  check('har bir KO o\'yinida stadion bor', allKo.every(x => x.venue && x.venue.length > 3));
+  check('har bir KO o\'yinida rasmiy sana (YYYY-MM-DD)', allKo.every(x => /^\d{4}-\d{2}-\d{2}$/.test(x.date)));
+  check('har bir KO o\'yinida utc bor', allKo.every(x => /^\d{4}-\d{2}-\d{2}T/.test(x.utc)));
+
+  // (11) koMiniCard: penalti/q.v. hisobi va g'olib ko'rsatiladi (issue #2 display)
+  const mc76 = sandbox.koMiniCard(allKo.find(x => x.m===76));
+  check('koMiniCard: penalti hisobi va koscore', /pen/.test(mc76) && /koscore/.test(mc76));
+  check('koMiniCard: g\'olib belgilanadi (win klass)', /\bwin\b/.test(mc76));
+  const mc78 = sandbox.koMiniCard(allKo.find(x => x.m===78));
+  check('koMiniCard: qo\'shimcha vaqt (q.v.) belgisi', /q\.v\./.test(mc78));
+
+  // (12) Eskirgan JONLI holat FT ga tushadi; kelajakdagi o'yin JONLI qoladi (finding #12)
+  const sf = FIXTURES[0];
+  const sv = { s:sf.status, u:sf.utc, m:sf.minute, h:sf.homeScore, a:sf.awayScore };
+  sf.status='LIVE'; sf.minute="67'"; sf.homeScore=1; sf.awayScore=0; sf.utc='2020-01-01T00:00:00Z';
+  sandbox.demoteStaleLive();
+  check('eskirgan JONLI => FT (start + 2.5s dan oshgan)', sf.status==='FT' && sf.minute===null);
+  const sf2 = FIXTURES[1];
+  const sv2 = { s:sf2.status, u:sf2.utc, m:sf2.minute, h:sf2.homeScore, a:sf2.awayScore };
+  sf2.status='LIVE'; sf2.minute="10'"; sf2.homeScore=0; sf2.awayScore=0; sf2.utc='2099-01-01T00:00:00Z';
+  sandbox.demoteStaleLive();
+  check('kelajakdagi JONLI o\'yin JONLI qoladi', sf2.status==='LIVE');
+  sf.status=sv.s; sf.utc=sv.u; sf.minute=sv.m; sf.homeScore=sv.h; sf.awayScore=sv.a;
+  sf2.status=sv2.s; sf2.utc=sv2.u; sf2.minute=sv2.m; sf2.homeScore=sv2.h; sf2.awayScore=sv2.a;
+
+  // (13) Render xato bersa ham apiLoading tiklanadi + koResults saqlanadi (findings #10/#11)
+  const realRenderAll = sandbox.renderAll;
+  sandbox.renderAll = function(){ throw new Error('render portlashi (test)'); };
+  sandbox.apiLoading = false;
+  const koBeforeLoad = Object.keys(sandbox.koResults).length;
+  sandbox.loadAll();
+  await new Promise(r => setTimeout(r, 80));
+  check('render xato bersa ham apiLoading=false (muzlamaydi)', sandbox.apiLoading === false);
+  check('to\'liq muvaffaqiyatsiz yangilanish koResults ni saqlaydi',
+    Object.keys(sandbox.koResults).length === koBeforeLoad && koBeforeLoad > 0);
+  sandbox.renderAll = realRenderAll;
+
+  // (14) FIFA Modda 13: o'zaro o'yin (h2h) QAYTA qo'llanishi umumiy GD dan ustun (finding #3)
+  //   Guruh A: Mexico, South Korea, South Africa — uchtasi 6 ochkoda (siklik), Czechia 0.
+  //   h2h: Mexico ajralib chiqadi; SK va SA h2h da teng → QAYTA qo'llash (SK–SA) SK ni yuqori qiladi.
+  //   Umumiy GD: SA (+4) > Mexico (+3) > SK (0) — ya'ni h2h umumiy GD ni bekor qiladi.
+  FIXTURES.forEach(f => { f.homeScore=null; f.awayScore=null; f.status='NS'; f.scoreSource=null; });
+  setM('Mexico','South Korea',3,0);
+  setM('South Korea','South Africa',3,1);
+  setM('South Africa','Mexico',2,1);
+  setM('Mexico','Czechia',1,0);
+  setM('South Korea','Czechia',1,0);
+  setM('South Africa','Czechia',5,0);
+  const stA2 = sandbox.standings('A');
+  check('h2h: uchala jamoa 6 ochkoda', stA2[0].pts===6 && stA2[1].pts===6 && stA2[2].pts===6);
+  check('h2h re-application tartibi: Mexico, South Korea, South Africa',
+    stA2[0].name==='Mexico' && stA2[1].name==='South Korea' && stA2[2].name==='South Africa',
+    stA2.map(t => t.name).join(','));
+  check('h2h umumiy GD dan ustun: eng yaxshi GD (South Africa +4) 3-o\'rinda',
+    stA2[2].name==='South Africa' && stA2[2].gd===4 && stA2[0].gd===3);
+  const rs = sandbox.rankSim(['Mexico','South Korea','South Africa','Czechia'], [
+    ['Mexico','South Korea',3,0], ['South Korea','South Africa',3,1], ['South Africa','Mexico',2,1],
+    ['Mexico','Czechia',1,0], ['South Korea','Czechia',1,0], ['South Africa','Czechia',5,0]
+  ]);
+  check('rankSim h2h tartibi = sortGroupTeams tartibi (chances/Monte-Karlo mosligi)',
+    rs[0].n==='Mexico' && rs[1].n==='South Korea' && rs[2].n==='South Africa' && rs[3].n==='Czechia',
+    rs.map(t => t.n).join(','));
+
+  // (15) 3-o'rinlar reytingi: teng pts/gd/gf da FIFA reytingi hal qiladi (finding #8)
+  //   Guruh A 3-o'rni (South Korea, r.25) va Guruh L 3-o'rni (Panama, r.34) bir xil pts3/gd-4/gf1.
+  FIXTURES.forEach(f => { f.homeScore=null; f.awayScore=null; f.status='NS'; f.scoreSource=null; });
+  setM('Mexico','South Africa',2,1); setM('Mexico','South Korea',3,0); setM('Mexico','Czechia',1,0);
+  setM('South Africa','South Korea',2,0); setM('South Africa','Czechia',1,0); setM('South Korea','Czechia',1,0);
+  setM('England','Croatia',2,1); setM('England','Panama',3,0); setM('England','Ghana',1,0);
+  setM('Croatia','Panama',2,0); setM('Croatia','Ghana',1,0); setM('Panama','Ghana',1,0);
+  const tr = sandbox.thirdPlaceRanking();
+  const sk3 = tr.find(t => t.group==='A');
+  const pn3 = tr.find(t => t.group==='L');
+  check('3-o\'rin A = South Korea, L = Panama', sk3.name==='South Korea' && pn3.name==='Panama');
+  check('3-o\'rinlar teng ko\'rsatkichda (pts3/gd-4/gf1)',
+    sk3.pts===3 && sk3.gd===-4 && sk3.gf===1 && pn3.pts===3 && pn3.gd===-4 && pn3.gf===1);
+  check('FIFA reyting tay-brek: South Korea (25) Panama (34) dan yuqori', tr.indexOf(sk3) < tr.indexOf(pn3));
+  check('FIFA reyting tay-brek: South Korea 3-o\'rinlar reytingi 1-chi', tr[0].name==='South Korea' && tr[0].group==='A');
 
   console.log('\n──────────────────────────────');
   console.log(passed + ' o\'tdi, ' + failed + ' yiqildi');
