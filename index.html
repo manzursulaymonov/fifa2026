@@ -879,10 +879,12 @@ function applyFifa(data) {
       // Guruh o'yini bo'lmasa (juftlik/sana mos emas) — pley-off nomzodi
       var m = groupMatchOf(hn, an, fdate);
       if (!m) {
-        if ((r.MatchStatus === 0 || r.MatchStatus === 3) && typeof r.Home.Score === 'number' && typeof r.Away.Score === 'number') {
+        // Faqat TUGAGAN pley-off natijasini qabul qilamiz (MatchStatus 0).
+        // Jonli o'yin (MatchStatus 3) vaqtinchalik hisob bilan g'olibni ERTA o'tkazib yubormasligi kerak.
+        if (r.MatchStatus === 0 && typeof r.Home.Score === 'number' && typeof r.Away.Score === 'number') {
           var pen = (typeof r.HomeScorePenalty === 'number' && typeof r.AwayScorePenalty === 'number');
           pushKO(hn, an, r.Home.Score, r.Away.Score,
-            pen ? r.HomeScorePenalty : null, pen ? r.AwayScorePenalty : null);
+            pen ? r.HomeScorePenalty : null, pen ? r.AwayScorePenalty : null, pen);
         }
         return;
       }
@@ -975,11 +977,16 @@ function applyEvents(events) {
     // Guruh o'yini bo'lmasa — pley-off nomzodi
     var m = groupMatchOf(ev.strHomeTeam, ev.strAwayTeam, ed);
     if (!m) {
+      // Pley-off: faqat TUGAGAN natijani qabul qilamiz — jonli holat (1H/2H/ET/PEN...)
+      // vaqtinchalik hisob bilan g'olibni erta o'tkazib yubormasligi kerak.
+      var kst = String(ev.strStatus || '').toUpperCase().trim();
       var khs = parseInt(ev.intHomeScore, 10), kas = parseInt(ev.intAwayScore, 10);
       var php = parseInt(ev.intHomeScorePenalty, 10), pap = parseInt(ev.intAwayScorePenalty, 10);
-      if (!isNaN(khs) && !isNaN(kas))
+      var koPen = !isNaN(php) && !isNaN(pap);
+      var koAet = koPen || kst === 'AET' || kst.indexOf('EXTRA TIME') >= 0;
+      if (!isNaN(khs) && !isNaN(kas) && LIVE_STATUSES.indexOf(kst) < 0)
         pushKO(ev.strHomeTeam, ev.strAwayTeam, khs, kas,
-          isNaN(php) ? null : php, isNaN(pap) ? null : pap);
+          koPen ? php : null, koPen ? pap : null, koAet);
       return;
     }
     var fix = m.fix;
@@ -1021,11 +1028,14 @@ var apiLoading = false;
 function demoteStaleLive() {
   var now = Date.now();
   FIXTURES.forEach(function(f) {
-    if (f.homeScore === null) return;
     var s = String(f.status || '').toUpperCase().trim();
-    if (LIVE_STATUSES.indexOf(s) < 0) return;
+    if (LIVE_STATUSES.indexOf(s) < 0) return;                    // faqat "jonli" holatlar
     var t = new Date(f.utc).getTime();
-    if (!isNaN(t) && now > t + 2.5 * 3600 * 1000) { f.status = 'FT'; f.minute = null; }
+    if (isNaN(t) || now <= t + 2.5 * 3600 * 1000) return;
+    // Boshlanish + ~2.5 soatdan oshdi va manba hali "jonli" deydi — muzlab qolmasin.
+    // Hisob bo'lsa FT, hisob umuman kelmagan bo'lsa NS (boshlanmagan holatga qaytaramiz).
+    f.status = (f.homeScore !== null) ? 'FT' : 'NS';
+    f.minute = null;
   });
 }
 
@@ -1152,9 +1162,9 @@ function buildScorerTotals() {
     f.homeScorers.forEach(function(s) { add(s.name, f.home, s.type); });
     f.awayScorers.forEach(function(s) { add(s.name, f.away, s.type); });
   });
-  // Pley-off (chiqaruv bosqichi) gollari ham qo'shiladi
+  // Pley-off (chiqaruv bosqichi) gollari ham qo'shiladi (faqat eskirmagan natijalar)
   Object.keys(koResults).forEach(function(mm) {
-    var r = koResults[mm]; if (!r || !r.done) return;
+    var r = koResults[mm]; if (!koIsFresh(mm)) return;
     var t = koTeams(mm); if (!t || !t.home || !t.away) return;
     (r.homeScorers || []).forEach(function(s) { add(s.name, t.home, s.type); });
     (r.awayScorers || []).forEach(function(s) { add(s.name, t.away, s.type); });
@@ -1733,7 +1743,7 @@ function fixtureCard(f, showGroup) {
 
 function koMiniCard(x) {
   var pl=(x.r==='R32'&&x.away==='3')?x.pool:false;
-  var rr=koResults[x.m], pld=rr&&rr.done, wn=pld?koWinner(x.m):null;
+  var rr=koResults[x.m], pld=koIsFresh(x.m), wn=pld?koWinner(x.m):null;
   var ht=resolveSlot(x.home,x.m), at=resolveSlot(x.away,x.m);
   var mid = pld
     ? '<span class="koscore">'+rr.hs+'–'+rr.as+(rr.ph!=null?' <i>('+rr.ph+'-'+rr.pa+' pen)</i>':(rr.aet?' <i>(q.v.)</i>':''))+'</span>'
@@ -2076,13 +2086,22 @@ function koByNum() { if(!_koByNum){ _koByNum={}; koAllMatches().forEach(function
 function resolveSlot(code, m) {
   if(code==='3') return thirdTeamForMatch(m);
   if(/^[12][A-L]$/.test(code)) return slotName(code);
-  var src=parseInt(code.slice(1),10), r=koResults[src];
-  if(!r||!r.done) return null;
+  var src=parseInt(code.slice(1),10);
+  if(!koIsFresh(src)) return null;
   return code.charAt(0)==='W' ? koWinner(src) : koLoser(src);
 }
 function koTeams(m) { var x=koByNum()[m]; if(!x) return null;
   return { home: resolveSlot(x.home,m), away: resolveSlot(x.away,m) }; }
-function koWinner(m) { var r=koResults[m]; if(!r||!r.done) return null; var t=koTeams(m); if(!t) return null;
+// Saqlangan natija joriy (qayta yechilgan) jamoalarga mos keladimi? Yuqori bosqichdagi
+// natija keyin o'zgarsa (masalan manba tuzatsa), eskirgan pastki natija boshqa jamoaga
+// yopishib fantom g'olib bermasligi kerak. homeTeam bo'lmasa — moslik tekshirilmaydi.
+function koIsFresh(m) {
+  var r=koResults[m]; if(!r||!r.done) return false;
+  if(r.homeTeam==null||r.awayTeam==null) return true;
+  var t=koTeams(m); if(!t||!t.home||!t.away) return false;
+  return normTeam(t.home)===normTeam(r.homeTeam) && normTeam(t.away)===normTeam(r.awayTeam);
+}
+function koWinner(m) { if(!koIsFresh(m)) return null; var r=koResults[m], t=koTeams(m); if(!t) return null;
   if(r.hs>r.as) return t.home; if(r.hs<r.as) return t.away;
   if(r.ph!=null&&r.pa!=null) return r.ph>r.pa?t.home:t.away; return null; }
 function koLoser(m) { var w=koWinner(m); if(!w) return null; var t=koTeams(m); if(!t) return null;
@@ -2123,6 +2142,7 @@ function ingestKO(evs) {
           var prev=koResults[m];
           if(prev && prev.decisive && !decisive){ assigned[ei]=true; break; } // aniqni tushirmaymiz
           koResults[m]={ hs:hs, as:as, ph:ph, pa:pa, aet:!!e.aet, decisive:decisive, done:true,
+            homeTeam: rt.home, awayTeam: rt.away, // natija yozilgandagi jamoalar (eskirishni aniqlash uchun)
             homeScorers: sw?(e.asc||[]):(e.hsc||[]), awayScorers: sw?(e.hsc||[]):(e.asc||[]) };
           assigned[ei]=true;
           if(decisive && !(prev && prev.decisive)) changed=true; // yangi g'olib → keyingi bosqichni ochadi
@@ -2162,7 +2182,7 @@ function renderBracketTree() {
       var x=r*colW, yc=(i+0.5)*band; pos[m]={x:x,y:yc};
       var mt=by[m]; if(!mt) return;
       var pl=(mt.r==='R32'&&mt.away==='3')?mt.pool:false;
-      var rr=koResults[m], pld=rr&&rr.done, wn=pld?koWinner(m):null;
+      var rr=koResults[m], pld=koIsFresh(m), wn=pld?koWinner(m):null;
       var ht=resolveSlot(mt.home,m), at=resolveSlot(mt.away,m);
       var hsc=pld?'<span class="sc">'+rr.hs+(rr.ph!=null?'<i>('+rr.ph+')</i>':'')+'</span>':'';
       var asc=pld?'<span class="sc">'+rr.as+(rr.pa!=null?'<i>('+rr.pa+')</i>':'')+'</span>':'';
@@ -2207,7 +2227,7 @@ function renderPlayoff() {
     html+='<div class="kosec"><h3>'+rd[1]+'</h3><div class="komlist">';
     ms.forEach(function(x){
       var pl=(x.r==='R32'&&x.away==='3')?x.pool:false;
-      var rr=koResults[x.m], pld=rr&&rr.done, wn=pld?koWinner(x.m):null;
+      var rr=koResults[x.m], pld=koIsFresh(x.m), wn=pld?koWinner(x.m):null;
       var ht=resolveSlot(x.home,x.m), at=resolveSlot(x.away,x.m);
       var extra = pld ? (rr.ph!=null ? ' <i>('+rr.ph+'-'+rr.pa+' pen)</i>' : (rr.aet ? ' <i>(q.v.)</i>' : '')) : '';
       var mid = pld

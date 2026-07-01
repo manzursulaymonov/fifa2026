@@ -840,7 +840,62 @@ check('shortName boshqa nomlarni o\'zgartirmaydi', sandbox.shortName('Uzbekistan
     Object.keys(sandbox.koResults).length === koBeforeLoad && koBeforeLoad > 0);
   sandbox.renderAll = realRenderAll;
 
-  // (14) FIFA Modda 13: o'zaro o'yin (h2h) QAYTA qo'llanishi umumiy GD dan ustun (finding #3)
+  // (14) Jonli pley-off natijasi ERTA yig'ilmaydi (re-audit: FIFA MatchStatus 3, TSDB live status)
+  //   Germany vs France — guruh juftligi emas, shuning uchun groupMatchOf null → KO tarmog'i.
+  sandbox._koEv = [];
+  sandbox.applyFifa({ Results: [
+    { Home:{TeamName:[{Description:'Germany'}], Score:1}, Away:{TeamName:[{Description:'France'}], Score:0}, MatchStatus:3 }
+  ]});
+  check('applyFifa: JONLI KO o\'yini yig\'ilmaydi (MatchStatus 3)', sandbox._koEv.length === 0);
+  sandbox._koEv = [];
+  sandbox.applyFifa({ Results: [
+    { Home:{TeamName:[{Description:'Germany'}], Score:2}, Away:{TeamName:[{Description:'France'}], Score:1},
+      MatchStatus:0, HomeScorePenalty:5, AwayScorePenalty:4 }
+  ]});
+  check('applyFifa: TUGAGAN KO yig\'iladi + penalti/aet',
+    sandbox._koEv.length===1 && sandbox._koEv[0].hs===2 && sandbox._koEv[0].ph===5 && sandbox._koEv[0].aet===true);
+
+  sandbox._koEv = [];
+  sandbox.applyEvents([{ strHomeTeam:'Germany', strAwayTeam:'France', intHomeScore:'2', intAwayScore:'1', strStatus:'2H' }]);
+  check('applyEvents: JONLI KO o\'yini yig\'ilmaydi (2H)', sandbox._koEv.length === 0);
+  sandbox._koEv = [];
+  sandbox.applyEvents([{ strHomeTeam:'Germany', strAwayTeam:'France', intHomeScore:'2', intAwayScore:'1', strStatus:'AET' }]);
+  check('applyEvents: TUGAGAN KO (AET) yig\'iladi + aet',
+    sandbox._koEv.length===1 && sandbox._koEv[0].hs===2 && sandbox._koEv[0].aet===true);
+  sandbox._koEv = [];
+  sandbox.applyEvents([{ strHomeTeam:'Germany', strAwayTeam:'France', intHomeScore:'1', intAwayScore:'1',
+    strStatus:'Match Finished', intHomeScorePenalty:'4', intAwayScorePenalty:'2' }]);
+  check('applyEvents: penalti KO yig\'iladi + aet',
+    sandbox._koEv.length===1 && sandbox._koEv[0].ph===4 && sandbox._koEv[0].aet===true);
+
+  // (15) Eskirgan JONLI + hisobsiz => NS (muzlab qolmaydi) (re-audit: findings #895/#1000)
+  const nsf = FIXTURES[2];
+  const nv = { s:nsf.status, u:nsf.utc, m:nsf.minute, h:nsf.homeScore, a:nsf.awayScore };
+  nsf.status='1H'; nsf.minute="20'"; nsf.homeScore=null; nsf.awayScore=null; nsf.utc='2020-01-01T00:00:00Z';
+  sandbox.demoteStaleLive();
+  check('eskirgan JONLI + hisobsiz => NS (JONLI muzlab qolmaydi)', nsf.status==='NS' && nsf.minute===null);
+  nsf.status=nv.s; nsf.utc=nv.u; nsf.minute=nv.m; nsf.homeScore=nv.h; nsf.awayScore=nv.a;
+
+  // (16) Yuqori bosqich g'olibi o'zgarsa, eskirgan pastki natija fantom g'olib bermaydi (re-audit #2085)
+  const t74 = sandbox.koTeams(74);
+  sandbox.ingestKO([{ h:t74.home, a:t74.away, hs:3, as:0 }]);   // W74 = t74.home
+  const t77 = sandbox.koTeams(77);
+  sandbox.ingestKO([{ h:t77.home, a:t77.away, hs:2, as:1 }]);   // W77 = t77.home
+  const t89 = sandbox.koTeams(89);                              // {home:W74, away:W77}
+  sandbox.ingestKO([{ h:t89.home, a:t89.away, hs:4, as:0 }]);   // M89 g'olibi = t89.home
+  check('M89 g\'olibi yozildi va yangi (fresh)', sandbox.koWinner(89) === t89.home && sandbox.koIsFresh(89) === true);
+  sandbox.ingestKO([{ h:t74.home, a:t74.away, hs:0, as:3 }]);   // M74 teskari → W74 = t74.away
+  check('M74 g\'olibi o\'zgardi (t74.away)', sandbox.koWinner(74) === t74.away);
+  check('M89 saqlangan natija eskirdi (koIsFresh false)', sandbox.koIsFresh(89) === false);
+  check('eskirgan M89 fantom g\'olib bermaydi', sandbox.koWinner(89) === null);
+  check('eskirgan M89 keyingi bosqichga jamoa o\'tkazmaydi', sandbox.resolveSlot('W89', 97) === null);
+  // holatni tiklaymiz (M74 haqiqiy g'olibi t74.home, M89 to'g'ri qayta yoziladi)
+  sandbox.ingestKO([{ h:t74.home, a:t74.away, hs:3, as:0 }]);
+  const t89b = sandbox.koTeams(89);
+  sandbox.ingestKO([{ h:t89b.home, a:t89b.away, hs:4, as:0 }]);
+  check('tiklangach M89 yana fresh', sandbox.koIsFresh(89) === true && sandbox.koWinner(89) === t89b.home);
+
+  // (17) FIFA Modda 13: o'zaro o'yin (h2h) QAYTA qo'llanishi umumiy GD dan ustun (finding #3)
   //   Guruh A: Mexico, South Korea, South Africa — uchtasi 6 ochkoda (siklik), Czechia 0.
   //   h2h: Mexico ajralib chiqadi; SK va SA h2h da teng → QAYTA qo'llash (SK–SA) SK ni yuqori qiladi.
   //   Umumiy GD: SA (+4) > Mexico (+3) > SK (0) — ya'ni h2h umumiy GD ni bekor qiladi.
